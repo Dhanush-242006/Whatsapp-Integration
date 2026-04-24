@@ -10,7 +10,7 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const DATA_DIR   = path.join(__dirname, '../data');
 const ACTIVITY_FILE = path.join(DATA_DIR, 'activity.json');
 const GROUPS_FILE   = path.join(DATA_DIR, 'groups.json');
@@ -39,7 +39,10 @@ function broadcast(event, data) {
 // ─── WhatsApp Client ──────────────────────────────────────────────────────────
 const client = new Client({
   authStrategy: new LocalAuth(),
-  puppeteer: { args: ['--no-sandbox', '--disable-setuid-sandbox'] }
+  puppeteer: {
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  }
 });
 
 client.on('qr', async (qr) => {
