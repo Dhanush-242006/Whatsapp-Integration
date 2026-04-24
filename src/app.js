@@ -41,7 +41,7 @@ const client = new Client({
   authStrategy: new LocalAuth(),
   puppeteer: {
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-    protocolTimeout: 120000,
+    protocolTimeout: 300000,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -49,8 +49,7 @@ const client = new Client({
       '--disable-gpu',
       '--disable-extensions',
       '--no-first-run',
-      '--no-zygote',
-      '--single-process'
+      '--no-zygote'
     ]
   }
 });
@@ -71,7 +70,8 @@ client.on('ready', async () => {
   cachedQR  = null;
   console.log('✅ WhatsApp connected!');
   broadcast('ready', {});
-  await saveGroups();
+  console.log('⏳ Waiting 60s before fetching groups...');
+  setTimeout(() => saveGroups(), 60000);
 });
 
 client.on('auth_failure', () => {
