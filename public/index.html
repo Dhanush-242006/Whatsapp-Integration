@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>WhatsApp Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:#f0f4f8;color:#1a202c;min-height:100vh;overflow-x:hidden}
+.page{display:none;min-height:100vh;animation:fadeIn .4s ease}
+.page.active{display:flex;flex-direction:column}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Loading ── */
+#page-loading{align-items:center;justify-content:center;gap:20px;flex-direction:column;background:radial-gradient(ellipse at center,#e8f5e9 0%,#f0f4f8 70%)}
+.spinner-wrap{position:relative;width:72px;height:72px}
+.spinner-ring{width:72px;height:72px;border-radius:50%;border:3px solid transparent;border-top-color:#25d366;border-right-color:#128c7e;animation:spin 1s linear infinite;position:absolute}
+.spinner-ring2{width:52px;height:52px;border:3px solid transparent;border-bottom-color:#25d36644;animation:spin 1.5s linear infinite reverse;top:10px;left:10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.wa-icon-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:22px}
+.loading-text{color:#718096;font-size:14px;letter-spacing:.5px}
+.loading-title{font-size:22px;font-weight:700;color:#1a202c;letter-spacing:-.3px}
+
+/* ── QR ── */
+#page-qr{align-items:center;justify-content:center;flex-direction:column;min-height:100vh;background:radial-gradient(ellipse at 30% 50%,#e8f5e9 0%,#f0f4f8 60%)}
+.qr-outer{position:relative}
+.qr-glow{position:absolute;inset:-20px;border-radius:32px;background:radial-gradient(ellipse,#25d36620,transparent 70%);filter:blur(20px);pointer-events:none}
+.qr-card{background:#fff;border:1px solid #e2e8f0;border-radius:24px;padding:44px 40px;text-align:center;max-width:400px;width:90%;position:relative;overflow:hidden;box-shadow:0 20px 60px #00000015}
+.qr-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#25d366,#128c7e,#25d366)}
+.qr-logo-wrap{width:64px;height:64px;background:linear-gradient(135deg,#25d366,#128c7e);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 16px;box-shadow:0 8px 24px #25d36630}
+.qr-card h2{font-size:22px;font-weight:700;color:#1a202c;letter-spacing:-.3px;margin-bottom:8px}
+.qr-card p{color:#718096;font-size:13px;line-height:1.7;margin-bottom:28px}
+#qr-img{width:240px;height:240px;border-radius:16px;border:3px solid #25d366;display:none;box-shadow:0 0 30px #25d36620}
+.qr-waiting{width:240px;height:240px;border-radius:16px;border:2px dashed #cbd5e0;display:flex;align-items:center;justify-content:center;color:#a0aec0;font-size:13px;flex-direction:column;gap:10px;margin:0 auto}
+.steps{text-align:left;margin-top:24px;display:flex;flex-direction:column;gap:10px}
+.step{display:flex;gap:12px;align-items:center;padding:10px 14px;background:#f7fafc;border-radius:10px;font-size:13px;color:#4a5568;transition:.2s;border:1px solid #e2e8f0}
+.step:hover{background:#edf2f7;color:#2d3748}
+.step-num{width:22px;height:22px;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+
+/* ── Header ── */
+.app-header{background:linear-gradient(135deg,#128c7e,#25d366);padding:0 28px;height:66px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;position:sticky;top:0;z-index:10;box-shadow:0 4px 16px #25d36630}
+.header-left{display:flex;align-items:center;gap:14px}
+.header-icon{width:46px;height:46px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px #00000020}
+.header-title{font-size:17px;font-weight:800;color:#1a202c;letter-spacing:-.2px}
+.header-subtitle{font-size:11px;color:#1a202caa;margin-top:1px;font-weight:400}
+.header-badge{display:flex;align-items:center;gap:6px;background:#ffffff25;border:1px solid #ffffff40;border-radius:20px;padding:5px 14px;font-size:12px;color:#fff;font-weight:600;backdrop-filter:blur(4px)}
+.live-dot{width:7px;height:7px;background:#25d366;border-radius:50%;animation:livePulse 2s ease infinite;box-shadow:0 0 6px #25d366}
+@keyframes livePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.85)}}
+.back-btn{display:flex;align-items:center;gap:7px;background:#ffffff25;border:1px solid #ffffff40;border-radius:10px;padding:8px 16px;color:#fff;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;font-family:inherit;backdrop-filter:blur(4px)}
+.back-btn:hover{background:#ffffff40;border-color:#ffffff80}
+.logout-btn{display:flex;align-items:center;gap:7px;background:#ffffff15;border:1px solid #ffffff40;border-radius:10px;padding:8px 16px;color:#fff;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;font-family:inherit}
+.logout-btn:hover{background:#ff525220;border-color:#ff7070;color:#ffd5d5}
+.header-right{display:flex;align-items:center;gap:10px}
+
+/* ── Groups page ── */
+.groups-body{padding:32px;flex:1}
+.page-header{margin-bottom:28px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.page-title{font-size:26px;font-weight:800;color:#1a202c;letter-spacing:-.5px}
+.page-sub{font-size:13px;color:#a0aec0;margin-top:4px}
+.group-search{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:10px 16px 10px 40px;color:#1a202c;font-size:14px;outline:none;font-family:inherit;width:260px;transition:.2s;box-shadow:0 1px 3px #00000008}
+.group-search:focus{border-color:#25d36680;box-shadow:0 0 0 3px #25d36615}
+.group-search::placeholder{color:#cbd5e0}
+.search-wrap{position:relative}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#a0aec0;font-size:15px;pointer-events:none}
+.summary-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:28px}
+.strip-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 20px;display:flex;align-items:center;gap:14px;box-shadow:0 1px 4px #00000008}
+.strip-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.strip-icon.blue{background:#ebf8ff;border:1px solid #bee3f8}
+.strip-icon.green{background:#f0fff4;border:1px solid #c6f6d5}
+.strip-icon.purple{background:#faf5ff;border:1px solid #e9d8fd}
+.strip-val{font-size:24px;font-weight:800;color:#1a202c}
+.strip-lbl{font-size:11px;color:#a0aec0;margin-top:1px;text-transform:uppercase;letter-spacing:.5px}
+.groups-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+
+/* ── Group card ── */
+.group-card{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:20px;cursor:pointer;transition:all .25s;position:relative;overflow:hidden;box-shadow:0 1px 4px #00000008}
+.group-card::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,#25d36606,transparent);opacity:0;transition:.25s;pointer-events:none}
+.group-card:hover{border-color:#25d36640;transform:translateY(-3px);box-shadow:0 12px 32px #00000012,0 0 0 1px #25d36620}
+.group-card:hover::after{opacity:1}
+.group-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#25d366,#128c7e);opacity:0;transition:.25s;border-radius:18px 18px 0 0}
+.group-card:hover::before{opacity:1}
+.card-top{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.group-avatar{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;text-shadow:0 1px 3px #00000040}
+.group-name{font-size:14px;font-weight:600;color:#2d3748;line-height:1.3;flex:1}
+.group-name small{display:block;font-size:11px;color:#a0aec0;font-weight:400;margin-top:2px}
+.progress-wrap{margin-bottom:14px}
+.progress-label{display:flex;justify-content:space-between;font-size:11px;color:#a0aec0;margin-bottom:6px}
+.progress-label span{color:#25a244;font-weight:600}
+.progress-bar{height:5px;background:#edf2f7;border-radius:99px;overflow:hidden}
+.progress-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#25d366,#128c7e);transition:width .6s ease}
+.card-stats{display:flex;gap:8px}
+.c-stat{flex:1;background:#f7fafc;border-radius:10px;padding:10px 8px;text-align:center;border:1px solid #edf2f7}
+.c-stat .v{font-size:20px;font-weight:800;line-height:1}
+.c-stat .l{font-size:9px;text-transform:uppercase;letter-spacing:.6px;margin-top:4px;color:#a0aec0}
+.c-stat.tot .v{color:#2d3748}
+.c-stat.act .v{color:#25a244}
+.c-stat.ina .v{color:#e53e3e}
+.no-groups{text-align:center;padding:80px 20px;color:#cbd5e0}
+.no-groups-icon{font-size:48px;margin-bottom:16px;opacity:.4}
+.no-groups p{font-size:15px}
+
+/* ── Group detail ── */
+.group-body{padding:32px;flex:1;overflow-y:auto}
+.detail-hero{background:linear-gradient(135deg,#f0fff4,#fff);border:1px solid #c6f6d5;border-radius:20px;padding:28px;margin-bottom:24px;position:relative;overflow:hidden;box-shadow:0 2px 8px #00000008}
+.detail-hero::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#25d366,#128c7e,transparent)}
+.detail-hero-top{display:flex;align-items:center;gap:16px;margin-bottom:20px}
+.detail-avatar{width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#fff;flex-shrink:0}
+.detail-name{font-size:22px;font-weight:800;color:#1a202c;letter-spacing:-.3px}
+.detail-meta{font-size:13px;color:#a0aec0;margin-top:4px}
+.detail-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.dstat{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px;text-align:center;box-shadow:0 1px 3px #00000006}
+.dstat .dlbl{font-size:10px;color:#a0aec0;text-transform:uppercase;letter-spacing:.6px}
+.dstat .dval{font-size:36px;font-weight:800;margin-top:6px;line-height:1}
+.dstat.total .dval{color:#2d3748}
+.dstat.active .dval{color:#25a244}
+.dstat.inactive .dval{color:#e53e3e}
+
+/* ── Chart ── */
+.chart-section{background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:28px;margin-bottom:24px;box-shadow:0 1px 4px #00000008}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.section-title{font-size:15px;font-weight:700;color:#1a202c}
+.section-hint{font-size:12px;color:#a0aec0;background:#f7fafc;border:1px solid #e2e8f0;border-radius:8px;padding:5px 12px}
+.chart-wrap{position:relative;height:200px}
+
+/* ── Day panel ── */
+.day-panel{background:#f0fff4;border:1px solid #c6f6d5;border-radius:16px;padding:24px;margin-top:20px;display:none;animation:fadeIn .3s ease}
+.day-panel.show{display:block}
+.day-panel-header{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+.day-panel-dot{width:10px;height:10px;background:#25d366;border-radius:50%;box-shadow:0 0 6px #25d36660}
+.day-panel-title{font-size:14px;font-weight:600;color:#25a244}
+.day-member{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #c6f6d5}
+.day-member:last-child{border-bottom:none}
+.day-av{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;color:#fff}
+.day-info{flex:1;min-width:0}
+.day-name{font-size:13px;color:#2d3748;font-weight:600}
+.day-num{font-size:11px;color:#a0aec0;margin-top:1px}
+.day-msg{font-size:12px;color:#718096;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.day-time{font-size:11px;color:#a0aec0;text-align:right;flex-shrink:0}
+.no-activity{text-align:center;padding:28px;color:#cbd5e0;font-size:13px}
+
+/* ── Members section ── */
+.members-section{background:#fff;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;box-shadow:0 1px 4px #00000008}
+.members-header{padding:20px 24px;border-bottom:1px solid #edf2f7;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.members-header .section-title{margin:0}
+.search-input{flex:1;min-width:160px;background:#f7fafc;border:1px solid #e2e8f0;border-radius:10px;padding:9px 14px;color:#2d3748;font-size:13px;outline:none;font-family:inherit;transition:.2s}
+.search-input:focus{border-color:#25d36660;background:#fff;box-shadow:0 0 0 3px #25d36610}
+.search-input::placeholder{color:#cbd5e0}
+.filter-btns{display:flex;gap:6px}
+.fbtn{padding:7px 14px;border-radius:10px;border:1px solid #e2e8f0;background:#f7fafc;color:#718096;font-size:12px;font-weight:500;cursor:pointer;transition:.15s;font-family:inherit}
+.fbtn:hover{border-color:#25d36650;color:#25a244;background:#f0fff4}
+.fbtn.active{background:linear-gradient(135deg,#25d366,#128c7e);border-color:transparent;color:#fff;font-weight:700}
+table{width:100%;border-collapse:collapse}
+thead th{text-align:left;padding:12px 20px;font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:#a0aec0;background:#f7fafc;border-bottom:1px solid #edf2f7;font-weight:600}
+tbody tr{border-bottom:1px solid #edf2f7;transition:.15s;cursor:default}
+tbody tr:hover{background:#f7fafc}
+td{padding:13px 20px;font-size:13px;vertical-align:middle}
+.m-avatar{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;color:#fff}
+.m-info{display:flex;align-items:center;gap:12px}
+.m-name{font-weight:600;color:#2d3748}
+.m-number{font-size:11px;color:#a0aec0;margin-top:2px}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.badge.active{background:#f0fff4;color:#25a244;border:1px solid #c6f6d5}
+.badge.inactive{background:#fff5f5;color:#e53e3e;border:1px solid #fed7d7}
+.badge.nodata{background:#f7fafc;color:#a0aec0;border:1px solid #e2e8f0}
+.dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.dot.g{background:#25d366}.dot.r{background:#e53e3e}.dot.grey{background:#a0aec0}
+.last-msg{max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#a0aec0}
+.t-time{font-size:11px;color:#cbd5e0;white-space:nowrap}
+.empty-row td{text-align:center;padding:48px;color:#cbd5e0;font-size:14px}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:28px;right:28px;background:#fff5f5;border:1px solid #fed7d7;color:#c53030;padding:14px 20px;border-radius:14px;font-size:13px;display:none;z-index:99;box-shadow:0 8px 32px #00000015;animation:fadeIn .3s ease}
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="page-loading" class="page active">
+  <div class="spinner-wrap">
+    <div class="spinner-ring"></div>
+    <div class="spinner-ring spinner-ring2"></div>
+    <div class="wa-icon-center">💬</div>
+  </div>
+  <div class="loading-title">WhatsApp Monitor</div>
+  <div class="loading-text">Connecting to WhatsApp...</div>
+</div>
+
+<!-- QR -->
+<div id="page-qr" class="page" style="min-height:100vh;background:radial-gradient(ellipse at 30% 50%,#0d2218 0%,#080b12 60%)">
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px">
+    <div class="qr-outer">
+      <div class="qr-glow"></div>
+      <div class="qr-card">
+        <div class="qr-logo-wrap">💬</div>
+        <h2>Link Your WhatsApp</h2>
+        <p>Scan the QR code below with your phone<br/>to connect the activity monitor</p>
+        <div id="qr-waiting" class="qr-waiting">
+          <div class="spinner-ring" style="width:36px;height:36px;border-width:2px"></div>
+          <span style="color:#1e2d3d;font-size:12px">Generating QR code...</span>
+        </div>
+        <img id="qr-img" src="" alt="QR Code"/>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div>Open WhatsApp on your phone</div>
+          <div class="step"><div class="step-num">2</div>Tap ⋮ → Linked Devices → Link a Device</div>
+          <div class="step"><div class="step-num">3</div>Point your phone at the QR code above</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Groups -->
+<div id="page-groups" class="page">
+  <div class="app-header">
+    <div class="header-left">
+      <div class="header-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.978-1.406A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z" fill="#25d366"/>
+          <path d="M8.5 8.5c.2-.5.45-.52.64-.53h.52c.18 0 .43.07.66.52.26.52.82 2 .9 2.14.08.14.13.3.03.48-.1.18-.15.3-.3.46-.14.17-.3.37-.43.5-.14.14-.29.29-.12.57.17.28.74 1.22 1.59 1.97.76.67 1.42.91 1.68 1.02.26.1.41.09.57-.05.17-.14.69-.8.87-1.08.18-.28.37-.24.62-.14.25.1 1.6.75 1.87.89.27.14.46.2.53.32.07.12.07.7-.17 1.37-.23.67-1.38 1.28-1.87 1.33-.5.05-.98.22-3.3-.69-2.78-1.08-4.54-3.9-4.68-4.07-.14-.18-1.12-1.5-1.12-2.86 0-1.36.7-2.03.96-2.3z" fill="#fff"/>
+        </svg>
+      </div>
+      <div>
+        <div class="header-title">WhatsApp <span style="font-weight:400;opacity:.85">Monitor</span></div>
+        <div class="header-subtitle">Group Activity Dashboard</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="header-badge"><div class="live-dot"></div> Live</div>
+      <button class="logout-btn" onclick="logout()">⏻ Logout</button>
+    </div>
+  </div>
+  <div class="groups-body">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Your Groups</div>
+        <div class="page-sub" id="groups-sub">Loading...</div>
+      </div>
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input class="group-search" id="group-search" placeholder="Search groups..." oninput="filterGroups()"/>
+      </div>
+    </div>
+    <div class="summary-strip" id="summary-strip" style="display:none">
+      <div class="strip-card"><div class="strip-icon blue">👥</div><div><div class="strip-val" id="s-total">0</div><div class="strip-lbl">Total Groups</div></div></div>
+      <div class="strip-card"><div class="strip-icon green">✅</div><div><div class="strip-val" id="s-active" style="color:#25d366">0</div><div class="strip-lbl">Groups with Activity</div></div></div>
+      <div class="strip-card"><div class="strip-icon purple">👤</div><div><div class="strip-val" id="s-members" style="color:#a78bfa">0</div><div class="strip-lbl">Total Members</div></div></div>
+    </div>
+    <div class="groups-grid" id="groups-grid"></div>
+  </div>
+</div>
+
+<!-- Group Detail -->
+<div id="page-group" class="page">
+  <div class="app-header">
+    <div class="header-left">
+      <button class="back-btn" onclick="showGroups()">← Back</button>
+      <div>
+        <div class="header-title" id="detail-title">Group</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="header-badge"><div class="live-dot"></div> Live</div>
+      <button class="logout-btn" onclick="logout()">⏻ Logout</button>
+    </div>
+  </div>
+  <div class="group-body">
+    <div class="detail-hero">
+      <div class="detail-hero-top">
+        <div class="detail-avatar" id="detail-avatar">👥</div>
+        <div>
+          <div class="detail-name" id="detail-name">—</div>
+          <div class="detail-meta" id="detail-meta">—</div>
+        </div>
+      </div>
+      <div class="detail-stats">
+        <div class="dstat total"><div class="dlbl">Total Members</div><div class="dval" id="d-total">—</div></div>
+        <div class="dstat active"><div class="dlbl">Active Today</div><div class="dval" id="d-active">—</div></div>
+        <div class="dstat inactive"><div class="dlbl">Inactive Today</div><div class="dval" id="d-inactive">—</div></div>
+      </div>
+    </div>
+
+    <div class="chart-section">
+      <div class="section-header">
+        <div class="section-title">📊 Weekly Activity</div>
+        <div class="section-hint">Click a bar to see members</div>
+      </div>
+      <div class="chart-wrap"><canvas id="weekChart"></canvas></div>
+      <div class="day-panel" id="day-panel">
+        <div class="day-panel-header">
+          <div class="day-panel-dot"></div>
+          <div class="day-panel-title" id="day-panel-title"></div>
+        </div>
+        <div id="day-panel-members"></div>
+      </div>
+    </div>
+
+    <div class="members-section">
+      <div class="members-header">
+        <div class="section-title">👤 Members</div>
+        <input class="search-input" id="member-search" placeholder="Search name or number…" oninput="renderMembers()"/>
+        <div class="filter-btns">
+          <button class="fbtn active" onclick="setFilter('all',this)">All</button>
+          <button class="fbtn" onclick="setFilter('active',this)">✅ Active</button>
+          <button class="fbtn" onclick="setFilter('inactive',this)">❌ Inactive</button>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>Member</th><th>Status</th><th>Last Message</th><th>Last Seen</th></tr></thead>
+        <tbody id="members-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let currentGroup=null,allMembers=[],memberFilter='all',weekChart=null,weekStats=[],allGroups=[];
+
+const GRAD=[['#e91e8c','#c2185b'],['#2196f3','#1565c0'],['#ff9800','#e65100'],['#9c27b0','#6a1b9a'],['#00bcd4','#006064'],['#4caf50','#1b5e20'],['#ff5722','#bf360c'],['#795548','#3e2723']];
+function avatarGrad(n){let h=0;for(const c of n)h=(h*31+c.charCodeAt(0))&0xffff;return GRAD[h%GRAD.length]}
+function avatarLetter(m){return m.name?m.name.trim()[0].toUpperCase():m.number.slice(-2)}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function fmtTime(iso){if(!iso)return'—';return new Date(iso).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';setTimeout(()=>t.style.display='none',4000)}
+function showPage(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById(id).classList.add('active')}
+function showGroups(){showPage('page-groups');loadGroups()}
+
+function connectSSE(){
+  const es=new EventSource('/events');
+  es.onmessage=({data})=>{
+    const{event,data:d}=JSON.parse(data);
+    if(event==='qr'){showPage('page-qr');document.getElementById('qr-waiting').style.display='none';const img=document.getElementById('qr-img');img.src=d.image;img.style.display='block'}
+    else if(event==='ready'){showGroups()}
+    else if(event==='status'){if(d.status==='initializing')showPage('page-loading');else if(d.status==='qr')showPage('page-qr')}
+    else if(event==='error'){showToast('⚠️ '+d.message)}
+  };
+  es.onerror=()=>setTimeout(connectSSE,3000);
+}
+
+async function loadGroups(){
+  const res=await fetch('/api/groups');
+  const data=await res.json();
+  allGroups=data.groups||[];
+  const sub=document.getElementById('groups-sub');
+  if(!allGroups.length){sub.textContent='No groups found.';document.getElementById('groups-grid').innerHTML='<div class="no-groups"><div class="no-groups-icon">💬</div><p>No groups found</p></div>';return}
+  sub.textContent=`${allGroups.length} groups — click any to view details`;
+  const strip=document.getElementById('summary-strip');
+  strip.style.display='grid';
+  document.getElementById('s-total').textContent=allGroups.length;
+  document.getElementById('s-active').textContent=allGroups.filter(g=>g.activeToday>0).length;
+  document.getElementById('s-members').textContent=allGroups.reduce((a,g)=>a+g.totalMembers,0).toLocaleString();
+  renderGroupCards(allGroups);
+}
+
+function filterGroups(){
+  const q=document.getElementById('group-search').value.toLowerCase();
+  renderGroupCards(allGroups.filter(g=>g.name.toLowerCase().includes(q)));
+}
+
+function renderGroupCards(groups){
+  const grid=document.getElementById('groups-grid');
+  if(!groups.length){grid.innerHTML='<div class="no-groups" style="grid-column:1/-1"><div class="no-groups-icon">🔍</div><p>No groups match your search</p></div>';return}
+  grid.innerHTML=groups.map(g=>{
+    const [c1,c2]=avatarGrad(g.id);
+    const pct=g.totalMembers?Math.round(g.activeToday/g.totalMembers*100):0;
+    const letter=g.name.trim()[0].toUpperCase();
+    return`<div class="group-card" onclick="openGroup('${encodeURIComponent(g.id)}','${esc(g.name)}')">
+      <div class="card-top">
+        <div class="group-avatar" style="background:linear-gradient(135deg,${c1},${c2})">${letter}</div>
+        <div class="group-name">${esc(g.name)}<small>${g.totalMembers} members</small></div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-label"><span style="color:#4a5568">Active today</span><span>${g.activeToday} / ${g.totalMembers}</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      </div>
+      <div class="card-stats">
+        <div class="c-stat tot"><div class="v">${g.totalMembers}</div><div class="l">Total</div></div>
+        <div class="c-stat act"><div class="v">${g.activeToday}</div><div class="l">Active</div></div>
+        <div class="c-stat ina"><div class="v">${g.inactiveToday}</div><div class="l">Inactive</div></div>
+      </div>
+    </div>`}).join('');
+}
+
+async function openGroup(encodedId,name){
+  showPage('page-group');
+  const dname=decodeURIComponent(name);
+  document.getElementById('detail-title').textContent=dname;
+  document.getElementById('detail-name').textContent=dname;
+  document.getElementById('detail-meta').textContent='Loading...';
+  const res=await fetch('/api/group/'+encodedId);
+  const data=await res.json();
+  if(data.error){showToast(data.error);return}
+  currentGroup=data;allMembers=data.members;weekStats=data.weekStats;memberFilter='all';
+  const [c1,c2]=avatarGrad(data.id||encodedId);
+  const av=document.getElementById('detail-avatar');
+  av.textContent=dname[0].toUpperCase();
+  av.style.background=`linear-gradient(135deg,${c1},${c2})`;
+  document.getElementById('detail-meta').textContent=`${data.totalMembers} members`;
+  const active=data.members.filter(m=>m.activeToday).length;
+  document.getElementById('d-total').textContent=data.totalMembers;
+  document.getElementById('d-active').textContent=active;
+  document.getElementById('d-inactive').textContent=data.totalMembers-active;
+  document.getElementById('day-panel').classList.remove('show');
+  document.getElementById('member-search').value='';
+  document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.fbtn')[0].classList.add('active');
+  renderChart();renderMembers();
+}
+
+function renderChart(){
+  if(weekChart){weekChart.destroy();weekChart=null}
+  const ctx=document.getElementById('weekChart').getContext('2d');
+  const vals=weekStats.map(d=>d.active);
+  const total=currentGroup.totalMembers;
+  weekChart=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:weekStats.map(d=>d.day),
+      datasets:[{
+        label:'Active',data:vals,
+        backgroundColor:vals.map(v=>v>0?'rgba(37,211,102,0.8)':'rgba(26,35,50,0.8)'),
+        borderColor:vals.map(v=>v>0?'#25d366':'#1a2332'),
+        borderWidth:1,borderRadius:8,borderSkipped:false
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      onClick:(e,els)=>{if(els.length)showDayPanel(els[0].index)},
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#0f1520',borderColor:'#1a2332',borderWidth:1,
+          titleColor:'#e2e8f0',bodyColor:'#25d366',padding:12,cornerRadius:10,
+          callbacks:{label:ctx=>` ${ctx.raw} / ${total} active`}
+        }
+      },
+      scales:{
+        x:{ticks:{color:'#a0aec0',font:{size:12,family:'Inter'}},grid:{color:'#edf2f7'},border:{color:'transparent'}},
+        y:{ticks:{color:'#a0aec0',stepSize:1,font:{size:11}},grid:{color:'#edf2f7'},border:{color:'transparent'},max:Math.max(total,1),min:0}
+      }
+    }
+  });
+}
+
+function showDayPanel(idx){
+  const day=weekStats[idx];
+  document.getElementById('day-panel-title').textContent=`${day.day} ${day.label||''} · ${day.active} of ${day.total} active`;
+  weekChart.data.datasets[0].backgroundColor=weekStats.map((d,i)=>i===idx?'rgba(37,211,102,1)':(d.active>0?'rgba(37,211,102,0.3)':'rgba(26,35,50,0.8)'));
+  weekChart.update();
+  const list=document.getElementById('day-panel-members');
+  if(!day.activeMembers.length){list.innerHTML='<div class="no-activity">No activity recorded this day</div>'}
+  else{
+    list.innerHTML=day.activeMembers.map(m=>{
+      const[c1,c2]=avatarGrad(m.number);
+      return`<div class="day-member">
+        <div class="day-av" style="background:linear-gradient(135deg,${c1},${c2})">${m.name?m.name[0].toUpperCase():m.number.slice(-2)}</div>
+        <div class="day-info">
+          <div class="day-name">${m.name?esc(m.name):'<span style="color:#374151">Unknown</span>'}</div>
+          <div class="day-num">+${m.number}</div>
+          <div class="day-msg">${m.lastMessage?esc(m.lastMessage):'—'}</div>
+        </div>
+        <div class="day-time">${fmtTime(m.timestamp)}</div>
+      </div>`}).join('')
+  }
+  document.getElementById('day-panel').classList.add('show');
+}
+
+function setFilter(f,btn){memberFilter=f;document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderMembers()}
+
+function renderMembers(){
+  const q=document.getElementById('member-search').value.toLowerCase();
+  const list=allMembers.filter(m=>{
+    const mq=!q||(m.name&&m.name.toLowerCase().includes(q))||m.number.includes(q);
+    const mf=memberFilter==='all'?true:memberFilter==='active'?m.activeToday:!m.activeToday;
+    return mq&&mf;
+  });
+  const tbody=document.getElementById('members-tbody');
+  if(!list.length){tbody.innerHTML='<tr class="empty-row"><td colspan="5">No members found</td></tr>';return}
+  tbody.innerHTML=list.map((m,i)=>{
+    const[c1,c2]=avatarGrad(m.number);
+    const badge=m.activeToday?`<span class="badge active"><span class="dot g"></span> Active</span>`:m.lastSeen?`<span class="badge inactive"><span class="dot r"></span> Inactive</span>`:`<span class="badge nodata"><span class="dot grey"></span> No data</span>`;
+    return`<tr>
+      <td style="color:#1e2d3d;font-size:12px;font-weight:600">${i+1}</td>
+      <td><div class="m-info">
+        <div class="m-avatar" style="background:linear-gradient(135deg,${c1},${c2})">${avatarLetter(m)}</div>
+        <div><div class="m-name">${m.name?esc(m.name):'<span style="color:#2a3a4a">Unknown</span>'}</div><div class="m-number">+${m.number}</div></div>
+      </div></td>
+      <td>${badge}</td>
+      <td><div class="last-msg">${m.lastMessage?esc(m.lastMessage):'<span style="color:#1e2d3d">—</span>'}</div></td>
+      <td><span class="t-time">${fmtTime(m.lastSeen)}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+async function logout() {
+  if (!confirm('Logout from WhatsApp? You will need to scan the QR code again.')) return;
+  showPage('page-loading');
+  await fetch('/api/logout', { method: 'POST' });
+  document.getElementById('qr-waiting').style.display='flex';
+  document.getElementById('qr-img').style.display='none';
+  document.getElementById('qr-img').src='';
+}
+
+connectSSE();
+</script>
+</body>
+</html>

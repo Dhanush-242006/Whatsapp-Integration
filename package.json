@@ -1,0 +1,22 @@
+{
+  "name": "whatsapp-inactivity-monitor",
+  "version": "1.0.0",
+  "description": "Monitors WhatsApp group and alerts TL about inactive candidates",
+  "main": "src/bot.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "bot": "node src/bot.js",
+    "web": "node src/server.js",
+    "dev": "nodemon src/app.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "node-cron": "^3.0.3",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.23.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  }
+}
