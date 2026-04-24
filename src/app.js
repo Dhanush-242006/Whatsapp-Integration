@@ -144,6 +144,12 @@ app.get('/events', (req, res) => {
   req.on('close', () => sseClients.delete(res));
 });
 
+app.post('/api/refresh-groups', async (req, res) => {
+  if (botStatus !== 'ready') return res.json({ ok: false, error: 'Not connected' });
+  await saveGroups();
+  res.json({ ok: true });
+});
+
 app.post('/api/logout', async (req, res) => {
   try {
     botStatus = 'initializing';

@@ -238,9 +238,12 @@ td{padding:13px 20px;font-size:13px;vertical-align:middle}
         <div class="page-title">Your Groups</div>
         <div class="page-sub" id="groups-sub">Loading...</div>
       </div>
-      <div class="search-wrap">
-        <span class="search-icon">🔍</span>
-        <input class="group-search" id="group-search" placeholder="Search groups..." oninput="filterGroups()"/>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button onclick="refreshGroups()" style="padding:8px 16px;border-radius:10px;border:1px solid #25d366;background:#fff;color:#128c7e;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit" id="refresh-btn">↻ Refresh</button>
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input class="group-search" id="group-search" placeholder="Search groups..." oninput="filterGroups()"/>
+        </div>
       </div>
     </div>
     <div class="summary-strip" id="summary-strip" style="display:none">
@@ -341,6 +344,13 @@ function connectSSE(){
   es.onerror=()=>setTimeout(connectSSE,3000);
 }
 
+async function refreshGroups(){
+  const btn=document.getElementById('refresh-btn');
+  btn.textContent='↻ Refreshing...';btn.disabled=true;
+  await fetch((window.BACKEND_URL||'')+'/api/refresh-groups',{method:'POST'});
+  await loadGroups();
+  btn.textContent='↻ Refresh';btn.disabled=false;
+}
 async function loadGroups(){
   const res=await fetch((window.BACKEND_URL||'')+'/api/groups');
   const data=await res.json();
