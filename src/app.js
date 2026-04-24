@@ -48,7 +48,9 @@ const client = new Client({
       '--disable-dev-shm-usage',
       '--disable-gpu',
       '--disable-extensions',
-      '--no-first-run'
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process'
     ]
   }
 });
@@ -102,21 +104,26 @@ client.on('message', async (msg) => {
   } catch {}
 });
 
-async function saveGroups() {
-  try {
-    const chats  = await client.getChats();
-    const groups = chats.filter(c => c.isGroup).map(g => ({
-      id:           g.id._serialized,
-      name:         g.name,
-      participants: g.participants.map(p => ({
-        number:  p.id.user,
-        isAdmin: !!(p.isAdmin || p.isSuperAdmin)
-      }))
-    }));
-    writeJSON(GROUPS_FILE, { groups, updatedAt: new Date().toISOString() });
-    console.log(`📋 ${groups.length} groups saved`);
-  } catch (err) {
-    console.error('saveGroups:', err.message);
+async function saveGroups(retries = 5) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      console.log(`📋 Fetching groups (attempt ${i + 1}/${retries})...`);
+      const chats  = await client.getChats();
+      const groups = chats.filter(c => c.isGroup).map(g => ({
+        id:           g.id._serialized,
+        name:         g.name,
+        participants: g.participants.map(p => ({
+          number:  p.id.user,
+          isAdmin: !!(p.isAdmin || p.isSuperAdmin)
+        }))
+      }));
+      writeJSON(GROUPS_FILE, { groups, updatedAt: new Date().toISOString() });
+      console.log(`📋 ${groups.length} groups saved`);
+      return;
+    } catch (err) {
+      console.error(`saveGroups attempt ${i + 1}:`, err.message);
+      if (i < retries - 1) await new Promise(r => setTimeout(r, 8000));
+    }
   }
 }
 
