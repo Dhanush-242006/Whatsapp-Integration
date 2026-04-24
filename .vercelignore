@@ -1,0 +1,10 @@
+node_modules
+src/
+package.json
+package-lock.json
+Dockerfile
+Procfile
+railway.json
+data/
+.wwebjs_auth/
+.wwebjs_cache/
