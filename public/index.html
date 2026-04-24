@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>WhatsApp Monitor</title>
+<script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
@@ -329,7 +330,7 @@ function showPage(id){document.querySelectorAll('.page').forEach(p=>p.classList.
 function showGroups(){showPage('page-groups');loadGroups()}
 
 function connectSSE(){
-  const es=new EventSource('/events');
+  const es=new EventSource((window.BACKEND_URL||'')+'/events');
   es.onmessage=({data})=>{
     const{event,data:d}=JSON.parse(data);
     if(event==='qr'){showPage('page-qr');document.getElementById('qr-waiting').style.display='none';const img=document.getElementById('qr-img');img.src=d.image;img.style.display='block'}
@@ -341,7 +342,7 @@ function connectSSE(){
 }
 
 async function loadGroups(){
-  const res=await fetch('/api/groups');
+  const res=await fetch((window.BACKEND_URL||'')+'/api/groups');
   const data=await res.json();
   allGroups=data.groups||[];
   const sub=document.getElementById('groups-sub');
@@ -390,7 +391,7 @@ async function openGroup(encodedId,name){
   document.getElementById('detail-title').textContent=dname;
   document.getElementById('detail-name').textContent=dname;
   document.getElementById('detail-meta').textContent='Loading...';
-  const res=await fetch('/api/group/'+encodedId);
+  const res=await fetch((window.BACKEND_URL||'')+'/api/group/'+encodedId);
   const data=await res.json();
   if(data.error){showToast(data.error);return}
   currentGroup=data;allMembers=data.members;weekStats=data.weekStats;memberFilter='all';
@@ -498,7 +499,7 @@ function renderMembers(){
 async function logout() {
   if (!confirm('Logout from WhatsApp? You will need to scan the QR code again.')) return;
   showPage('page-loading');
-  await fetch('/api/logout', { method: 'POST' });
+  await fetch((window.BACKEND_URL||'')+'/api/logout', { method: 'POST' });
   document.getElementById('qr-waiting').style.display='flex';
   document.getElementById('qr-img').style.display='none';
   document.getElementById('qr-img').src='';
