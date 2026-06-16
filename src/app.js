@@ -11,10 +11,6 @@ process.on('unhandledRejection', (reason) => {
   console.error('⚠️  Unhandled rejection:', reason?.message || reason);
 });
 
-// Remove Chrome lockfile left by a previous unclean shutdown
-const lockFile = path.join(DATA_DIR, 'wwebjs_auth/session/SingletonLock');
-try { fs.unlinkSync(lockFile); console.log('🔓 Removed stale Chrome lockfile'); } catch {}
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_DIR   = path.join(__dirname, '../data');
@@ -23,6 +19,10 @@ const GROUPS_FILE    = path.join(DATA_DIR, 'groups.json');
 const MESSAGES_FILE  = path.join(DATA_DIR, 'messages.json');
 const SUMMARIES_FILE = path.join(DATA_DIR, 'summaries.json');
 const CONFIG_FILE    = path.join(DATA_DIR, 'config.json');
+
+// Remove Chrome lockfile left by a previous unclean shutdown
+const lockFile = path.join(DATA_DIR, 'wwebjs_auth/session/SingletonLock');
+try { fs.unlinkSync(lockFile); console.log('🔓 Removed stale Chrome lockfile'); } catch {}
 
 const sseClients = new Set();
 let botStatus = 'initializing';
