@@ -12,7 +12,7 @@ process.on('unhandledRejection', (reason) => {
 });
 
 // Remove Chrome lockfile left by a previous unclean shutdown
-const lockFile = path.join(__dirname, '../.wwebjs_auth/session/SingletonLock');
+const lockFile = path.join(DATA_DIR, 'wwebjs_auth/session/SingletonLock');
 try { fs.unlinkSync(lockFile); console.log('🔓 Removed stale Chrome lockfile'); } catch {}
 
 const app = express();
@@ -58,7 +58,7 @@ function cleanOldMessages(msgs) {
 
 // ─── WhatsApp Client ──────────────────────────────────────────────────────────
 const client = new Client({
-  authStrategy: new LocalAuth(),
+  authStrategy: new LocalAuth({ dataPath: DATA_DIR }),
   puppeteer: {
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     protocolTimeout: 300000,
