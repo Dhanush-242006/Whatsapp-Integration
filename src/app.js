@@ -745,10 +745,11 @@ app.listen(PORT, () => console.log(`🌐 Dashboard: http://localhost:${PORT}`));
 console.log('🚀 Starting WhatsApp Monitor...');
 client.initialize();
 
-// Watchdog: if not connected within 3 minutes, exit so PM2 restarts us
+// Watchdog: only exit if stuck in 'initializing' (Chrome failed to launch)
+// Don't exit if 'qr' — user may just need to scan
 setTimeout(() => {
-  if (botStatus !== 'ready') {
-    console.error('⏰ Watchdog: not connected after 3 minutes — restarting...');
+  if (botStatus === 'initializing') {
+    console.error('⏰ Watchdog: Chrome stuck initializing — restarting...');
     process.exit(1);
   }
-}, 3 * 60 * 1000);
+}, 5 * 60 * 1000);
