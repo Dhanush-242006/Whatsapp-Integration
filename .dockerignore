@@ -1,0 +1,6 @@
+node_modules
+.wwebjs_auth
+data
+.pm2
+*.log
+.env

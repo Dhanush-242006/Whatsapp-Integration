@@ -6,304 +6,720 @@
 <title>WhatsApp Monitor</title>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
+:root {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-2: #f1f5f9;
+  --border: #e2e8f0;
+  --border-light: #f1f5f9;
+  --primary: #22c55e;
+  --primary-dark: #16a34a;
+  --primary-light: #dcfce7;
+  --accent: #8b5cf6;
+  --accent-light: #ede9fe;
+  --text: #0f172a;
+  --text-2: #475569;
+  --text-3: #94a3b8;
+  --danger: #ef4444;
+  --danger-light: #fee2e2;
+  --warning: #f59e0b;
+  --warning-light: #fef3c7;
+  --shadow-xs: 0 1px 2px rgba(15,23,42,.06);
+  --shadow: 0 4px 6px rgba(15,23,42,.06), 0 2px 4px rgba(15,23,42,.03);
+  --shadow-lg: 0 10px 20px rgba(15,23,42,.08), 0 4px 8px rgba(15,23,42,.04);
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+}
+
+html.dark {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface-2: #1c2128;
+  --border: #30363d;
+  --border-light: #21262d;
+  --text: #e6edf3;
+  --text-2: #8b949e;
+  --text-3: #484f58;
+  --primary-light: rgba(34,197,94,.12);
+  --accent-light: rgba(139,92,246,.12);
+  --warning-light: rgba(245,158,11,.12);
+  --danger-light: rgba(239,68,68,.12);
+}
+
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Inter',sans-serif;background:#f0f4f8;color:#1a202c;min-height:100vh;overflow-x:hidden}
-.page{display:none;min-height:100vh;animation:fadeIn .4s ease}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;transition:background .2s,color .2s}
+.page{display:none;min-height:100vh;animation:fadeIn .35s ease}
 .page.active{display:flex;flex-direction:column}
-@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
 /* ── Loading ── */
-#page-loading{align-items:center;justify-content:center;gap:20px;flex-direction:column;background:radial-gradient(ellipse at center,#e8f5e9 0%,#f0f4f8 70%)}
-.spinner-wrap{position:relative;width:72px;height:72px}
-.spinner-ring{width:72px;height:72px;border-radius:50%;border:3px solid transparent;border-top-color:#25d366;border-right-color:#128c7e;animation:spin 1s linear infinite;position:absolute}
-.spinner-ring2{width:52px;height:52px;border:3px solid transparent;border-bottom-color:#25d36644;animation:spin 1.5s linear infinite reverse;top:10px;left:10px}
+#page-loading{align-items:center;justify-content:center;gap:16px;flex-direction:column;background:radial-gradient(ellipse at center, var(--primary-light) 0%, var(--bg) 70%)}
+.spinner{width:48px;height:48px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--primary);animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.wa-icon-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:22px}
-.loading-text{color:#718096;font-size:14px;letter-spacing:.5px}
-.loading-title{font-size:22px;font-weight:700;color:#1a202c;letter-spacing:-.3px}
+.loading-title{font-size:20px;font-weight:700;color:var(--text);letter-spacing:-.3px}
+.loading-text{font-size:13px;color:var(--text-3)}
 
 /* ── QR ── */
-#page-qr{align-items:center;justify-content:center;flex-direction:column;min-height:100vh;background:radial-gradient(ellipse at 30% 50%,#e8f5e9 0%,#f0f4f8 60%)}
-.qr-outer{position:relative}
-.qr-glow{position:absolute;inset:-20px;border-radius:32px;background:radial-gradient(ellipse,#25d36620,transparent 70%);filter:blur(20px);pointer-events:none}
-.qr-card{background:#fff;border:1px solid #e2e8f0;border-radius:24px;padding:44px 40px;text-align:center;max-width:400px;width:90%;position:relative;overflow:hidden;box-shadow:0 20px 60px #00000015}
-.qr-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#25d366,#128c7e,#25d366)}
-.qr-logo-wrap{width:64px;height:64px;background:linear-gradient(135deg,#25d366,#128c7e);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 16px;box-shadow:0 8px 24px #25d36630}
-.qr-card h2{font-size:22px;font-weight:700;color:#1a202c;letter-spacing:-.3px;margin-bottom:8px}
-.qr-card p{color:#718096;font-size:13px;line-height:1.7;margin-bottom:28px}
-#qr-img{width:240px;height:240px;border-radius:16px;border:3px solid #25d366;display:none;box-shadow:0 0 30px #25d36620}
-.qr-waiting{width:240px;height:240px;border-radius:16px;border:2px dashed #cbd5e0;display:flex;align-items:center;justify-content:center;color:#a0aec0;font-size:13px;flex-direction:column;gap:10px;margin:0 auto}
-.steps{text-align:left;margin-top:24px;display:flex;flex-direction:column;gap:10px}
-.step{display:flex;gap:12px;align-items:center;padding:10px 14px;background:#f7fafc;border-radius:10px;font-size:13px;color:#4a5568;transition:.2s;border:1px solid #e2e8f0}
-.step:hover{background:#edf2f7;color:#2d3748}
-.step-num{width:22px;height:22px;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+#page-qr{align-items:center;justify-content:center;flex-direction:column;min-height:100vh;background:radial-gradient(ellipse at 40% 50%, var(--primary-light) 0%, var(--bg) 65%)}
+.qr-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-xl);padding:40px 36px;text-align:center;max-width:380px;width:90%;position:relative;overflow:hidden;box-shadow:var(--shadow-lg)}
+.qr-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--primary),var(--primary-dark),var(--primary))}
+.qr-logo{width:60px;height:60px;background:linear-gradient(135deg,var(--primary),var(--primary-dark));border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 18px;box-shadow:0 8px 20px rgba(34,197,94,.25)}
+.qr-card h2{font-size:20px;font-weight:700;color:var(--text);letter-spacing:-.3px;margin-bottom:8px}
+.qr-card p{color:var(--text-2);font-size:13px;line-height:1.7;margin-bottom:24px}
+#qr-img{width:220px;height:220px;border-radius:var(--radius);border:3px solid var(--primary);display:none;box-shadow:0 0 24px rgba(34,197,94,.2);margin:0 auto}
+#qr-waiting{width:220px;height:220px;border-radius:var(--radius);border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--text-3);font-size:13px;flex-direction:column;gap:10px;margin:0 auto;background:var(--surface-2)}
+.qr-steps{text-align:left;margin-top:24px;display:flex;flex-direction:column;gap:8px}
+.qr-step{display:flex;gap:12px;align-items:center;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius);font-size:13px;color:var(--text-2);border:1px solid var(--border-light);transition:.2s}
+.qr-step:hover{border-color:var(--primary);color:var(--text)}
+.step-num{width:22px;height:22px;background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
 
-/* ── Header ── */
-.app-header{background:linear-gradient(135deg,#128c7e,#25d366);padding:0 28px;height:66px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;position:sticky;top:0;z-index:10;box-shadow:0 4px 16px #25d36630}
-.header-left{display:flex;align-items:center;gap:14px}
-.header-icon{width:46px;height:46px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px #00000020}
-.header-title{font-size:17px;font-weight:800;color:#1a202c;letter-spacing:-.2px}
-.header-subtitle{font-size:11px;color:#1a202caa;margin-top:1px;font-weight:400}
-.header-badge{display:flex;align-items:center;gap:6px;background:#ffffff25;border:1px solid #ffffff40;border-radius:20px;padding:5px 14px;font-size:12px;color:#fff;font-weight:600;backdrop-filter:blur(4px)}
-.live-dot{width:7px;height:7px;background:#25d366;border-radius:50%;animation:livePulse 2s ease infinite;box-shadow:0 0 6px #25d366}
-@keyframes livePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.85)}}
-.back-btn{display:flex;align-items:center;gap:7px;background:#ffffff25;border:1px solid #ffffff40;border-radius:10px;padding:8px 16px;color:#fff;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;font-family:inherit;backdrop-filter:blur(4px)}
-.back-btn:hover{background:#ffffff40;border-color:#ffffff80}
-.logout-btn{display:flex;align-items:center;gap:7px;background:#ffffff15;border:1px solid #ffffff40;border-radius:10px;padding:8px 16px;color:#fff;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;font-family:inherit}
-.logout-btn:hover{background:#ff525220;border-color:#ff7070;color:#ffd5d5}
-.header-right{display:flex;align-items:center;gap:10px}
+/* ── Navbar ── */
+.navbar{background:var(--surface);height:60px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;position:sticky;top:0;z-index:20;border-bottom:1px solid var(--border);box-shadow:var(--shadow-xs)}
+.nav-left{display:flex;align-items:center;gap:12px}
+.nav-logo{width:36px;height:36px;background:linear-gradient(135deg,var(--primary),var(--primary-dark));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;box-shadow:0 2px 8px rgba(34,197,94,.3)}
+.nav-brand{display:flex;flex-direction:column}
+.nav-title{font-size:15px;font-weight:800;color:var(--text);letter-spacing:-.2px;line-height:1.1}
+.nav-sub{font-size:11px;color:var(--text-3);font-weight:400}
+.nav-right{display:flex;align-items:center;gap:8px}
+.live-chip{display:flex;align-items:center;gap:6px;background:var(--primary-light);border:1px solid rgba(34,197,94,.3);border-radius:20px;padding:5px 12px;font-size:12px;color:var(--primary-dark);font-weight:600}
+.live-dot{width:6px;height:6px;background:var(--primary);border-radius:50%;animation:livePulse 2s ease infinite}
+@keyframes livePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}}
 
-/* ── Groups page ── */
-.groups-body{padding:32px;flex:1}
-.page-header{margin-bottom:28px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:16px}
-.page-title{font-size:26px;font-weight:800;color:#1a202c;letter-spacing:-.5px}
-.page-sub{font-size:13px;color:#a0aec0;margin-top:4px}
-.group-search{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:10px 16px 10px 40px;color:#1a202c;font-size:14px;outline:none;font-family:inherit;width:260px;transition:.2s;box-shadow:0 1px 3px #00000008}
-.group-search:focus{border-color:#25d36680;box-shadow:0 0 0 3px #25d36615}
-.group-search::placeholder{color:#cbd5e0}
-.search-wrap{position:relative}
-.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#a0aec0;font-size:15px;pointer-events:none}
-.summary-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:28px}
-.strip-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 20px;display:flex;align-items:center;gap:14px;box-shadow:0 1px 4px #00000008}
-.strip-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
-.strip-icon.blue{background:#ebf8ff;border:1px solid #bee3f8}
-.strip-icon.green{background:#f0fff4;border:1px solid #c6f6d5}
-.strip-icon.purple{background:#faf5ff;border:1px solid #e9d8fd}
-.strip-val{font-size:24px;font-weight:800;color:#1a202c}
-.strip-lbl{font-size:11px;color:#a0aec0;margin-top:1px;text-transform:uppercase;letter-spacing:.5px}
-.groups-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text-2);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit;white-space:nowrap}
+.btn:hover{border-color:var(--primary);color:var(--primary-dark);background:var(--primary-light)}
+.btn-primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-dark);border-color:var(--primary-dark);color:#fff}
+.btn-danger{background:var(--danger-light);border-color:rgba(239,68,68,.3);color:var(--danger)}
+.btn-danger:hover{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn-ghost{background:transparent;border-color:transparent;color:var(--text-2)}
+.btn-ghost:hover{background:var(--surface-2);border-color:var(--border);color:var(--text)}
+.btn-icon{width:34px;height:34px;padding:0;justify-content:center;border-radius:var(--radius)}
+
+/* ── Content ── */
+.content{max-width:1280px;margin:0 auto;padding:28px 24px;width:100%}
+
+/* ── Page header ── */
+.page-hdr{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:24px}
+.page-hdr-left h1{font-size:22px;font-weight:800;color:var(--text);letter-spacing:-.4px}
+.page-hdr-left p{font-size:13px;color:var(--text-3);margin-top:3px}
+.page-hdr-right{display:flex;align-items:center;gap:8px}
+
+/* ── KPI strip ── */
+#summary-strip{display:none;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+.kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-xs);transition:.2s}
+.kpi-card:hover{box-shadow:var(--shadow)}
+.kpi-icon{width:42px;height:42px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.kpi-icon.blue{background:#eff6ff;border:1px solid #bfdbfe}
+.kpi-icon.green{background:var(--primary-light);border:1px solid rgba(34,197,94,.3)}
+.kpi-icon.purple{background:var(--accent-light);border:1px solid rgba(139,92,246,.3)}
+html.dark .kpi-icon.blue{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.2)}
+.kpi-val{font-size:26px;font-weight:800;color:var(--text);line-height:1}
+.kpi-lbl{font-size:11px;color:var(--text-3);margin-top:3px;text-transform:uppercase;letter-spacing:.5px}
+
+/* ── Toolbar ── */
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.search-wrap{position:relative;flex:1;min-width:180px}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-3);font-size:14px;pointer-events:none}
+.search-input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:9px 14px 9px 38px;color:var(--text);font-size:13px;outline:none;font-family:inherit;transition:.2s;box-shadow:var(--shadow-xs)}
+.search-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(34,197,94,.12)}
+.search-input::placeholder{color:var(--text-3)}
+.sort-select{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:9px 14px;color:var(--text-2);font-size:13px;outline:none;font-family:inherit;cursor:pointer;transition:.2s;box-shadow:var(--shadow-xs)}
+.sort-select:focus{border-color:var(--primary)}
+html.dark .sort-select{background:var(--surface);color:var(--text-2)}
+.filter-pills{display:flex;gap:6px}
+.pill{padding:7px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);font-size:12px;font-weight:500;cursor:pointer;transition:.15s;font-family:inherit}
+.pill:hover{border-color:var(--primary);color:var(--primary-dark);background:var(--primary-light)}
+.pill.active{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:700}
+
+/* ── Groups grid ── */
+#groups-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px}
 
 /* ── Group card ── */
-.group-card{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:20px;cursor:pointer;transition:all .25s;position:relative;overflow:hidden;box-shadow:0 1px 4px #00000008}
-.group-card::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,#25d36606,transparent);opacity:0;transition:.25s;pointer-events:none}
-.group-card:hover{border-color:#25d36640;transform:translateY(-3px);box-shadow:0 12px 32px #00000012,0 0 0 1px #25d36620}
-.group-card:hover::after{opacity:1}
-.group-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#25d366,#128c7e);opacity:0;transition:.25s;border-radius:18px 18px 0 0}
-.group-card:hover::before{opacity:1}
-.card-top{display:flex;align-items:center;gap:12px;margin-bottom:16px}
-.group-avatar{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;text-shadow:0 1px 3px #00000040}
-.group-name{font-size:14px;font-weight:600;color:#2d3748;line-height:1.3;flex:1}
-.group-name small{display:block;font-size:11px;color:#a0aec0;font-weight:400;margin-top:2px}
-.progress-wrap{margin-bottom:14px}
-.progress-label{display:flex;justify-content:space-between;font-size:11px;color:#a0aec0;margin-bottom:6px}
-.progress-label span{color:#25a244;font-weight:600}
-.progress-bar{height:5px;background:#edf2f7;border-radius:99px;overflow:hidden}
-.progress-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#25d366,#128c7e);transition:width .6s ease}
-.card-stats{display:flex;gap:8px}
-.c-stat{flex:1;background:#f7fafc;border-radius:10px;padding:10px 8px;text-align:center;border:1px solid #edf2f7}
-.c-stat .v{font-size:20px;font-weight:800;line-height:1}
-.c-stat .l{font-size:9px;text-transform:uppercase;letter-spacing:.6px;margin-top:4px;color:#a0aec0}
-.c-stat.tot .v{color:#2d3748}
-.c-stat.act .v{color:#25a244}
-.c-stat.ina .v{color:#e53e3e}
-.no-groups{text-align:center;padding:80px 20px;color:#cbd5e0}
-.no-groups-icon{font-size:48px;margin-bottom:16px;opacity:.4}
-.no-groups p{font-size:15px}
+.group-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-xl);padding:20px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;box-shadow:var(--shadow-xs)}
+.group-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.group-card.activity-high{border-top:2px solid var(--primary)}
+.group-card.activity-high:hover{border-color:var(--primary)}
+.group-card.activity-mid{border-top:2px solid var(--warning)}
+.group-card.activity-mid:hover{border-color:var(--warning)}
+.group-card.activity-low{border-top:2px solid var(--danger)}
+.group-card.activity-low:hover{border-color:var(--danger)}
+
+.pin-btn{position:absolute;top:12px;right:12px;background:none;border:none;cursor:pointer;font-size:15px;opacity:.35;transition:.2s;z-index:2;padding:4px;border-radius:6px}
+.pin-btn:hover,.pin-btn.pinned{opacity:1}
+.pin-badge{position:absolute;top:10px;left:10px;background:var(--warning);color:#fff;border-radius:6px;padding:2px 7px;font-size:9px;font-weight:700;letter-spacing:.3px}
+
+.gc-top{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.gc-avatar{width:44px;height:44px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:#fff;flex-shrink:0;text-shadow:0 1px 2px rgba(0,0,0,.3)}
+.gc-info{flex:1;min-width:0}
+.gc-name{font-size:14px;font-weight:700;color:var(--text);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gc-meta{font-size:11px;color:var(--text-3);margin-top:2px}
+
+.gc-badge{padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;flex-shrink:0}
+.gc-badge.activity-high{background:var(--primary-light);color:var(--primary-dark)}
+.gc-badge.activity-mid{background:var(--warning-light);color:var(--warning)}
+.gc-badge.activity-low{background:var(--danger-light);color:var(--danger)}
+
+.gc-bar-wrap{margin-bottom:14px}
+.gc-bar-label{display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);margin-bottom:6px}
+.gc-bar-label b{font-weight:600;color:var(--text-2)}
+.gc-bar{height:5px;background:var(--surface-2);border-radius:99px;overflow:hidden}
+.gc-fill{height:100%;border-radius:99px;transition:width .5s ease}
+.gc-fill.activity-high{background:linear-gradient(90deg,var(--primary),var(--primary-dark))}
+.gc-fill.activity-mid{background:linear-gradient(90deg,var(--warning),#d97706)}
+.gc-fill.activity-low{background:linear-gradient(90deg,var(--danger),#dc2626)}
+
+.gc-bottom{display:flex;gap:8px}
+.gc-stat{flex:1;background:var(--surface-2);border-radius:var(--radius);padding:10px 8px;text-align:center;border:1px solid var(--border-light)}
+.gv{font-size:18px;font-weight:800;line-height:1}
+.gl{font-size:9px;text-transform:uppercase;letter-spacing:.6px;margin-top:3px;color:var(--text-3)}
+.gc-stat.tot .gv{color:var(--text)}
+.gc-stat.act .gv{color:var(--primary-dark)}
+.gc-stat.ina .gv{color:var(--danger)}
+
+.no-groups{grid-column:1/-1;text-align:center;padding:72px 20px;color:var(--text-3)}
+.no-groups-icon{font-size:44px;margin-bottom:14px;opacity:.4}
+.no-groups p{font-size:14px}
 
 /* ── Group detail ── */
-.group-body{padding:32px;flex:1;overflow-y:auto}
-.detail-hero{background:linear-gradient(135deg,#f0fff4,#fff);border:1px solid #c6f6d5;border-radius:20px;padding:28px;margin-bottom:24px;position:relative;overflow:hidden;box-shadow:0 2px 8px #00000008}
-.detail-hero::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#25d366,#128c7e,transparent)}
-.detail-hero-top{display:flex;align-items:center;gap:16px;margin-bottom:20px}
-.detail-avatar{width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#fff;flex-shrink:0}
-.detail-name{font-size:22px;font-weight:800;color:#1a202c;letter-spacing:-.3px}
-.detail-meta{font-size:13px;color:#a0aec0;margin-top:4px}
-.detail-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-.dstat{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px;text-align:center;box-shadow:0 1px 3px #00000006}
-.dstat .dlbl{font-size:10px;color:#a0aec0;text-transform:uppercase;letter-spacing:.6px}
-.dstat .dval{font-size:36px;font-weight:800;margin-top:6px;line-height:1}
-.dstat.total .dval{color:#2d3748}
-.dstat.active .dval{color:#25a244}
-.dstat.inactive .dval{color:#e53e3e}
+.detail-content{padding:24px;flex:1;overflow-y:auto;max-width:100%}
 
-/* ── Chart ── */
-.chart-section{background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:28px;margin-bottom:24px;box-shadow:0 1px 4px #00000008}
-.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
-.section-title{font-size:15px;font-weight:700;color:#1a202c}
-.section-hint{font-size:12px;color:#a0aec0;background:#f7fafc;border:1px solid #e2e8f0;border-radius:8px;padding:5px 12px}
+.hero-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-xl);padding:24px;margin-bottom:20px;position:relative;overflow:hidden;box-shadow:var(--shadow-xs)}
+.hero-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--primary),var(--accent),var(--primary))}
+.hero-top{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+#detail-avatar{width:52px;height:52px;border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;flex-shrink:0}
+#detail-name{font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.3px}
+#detail-meta{font-size:13px;color:var(--text-3);margin-top:3px}
+.hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.hstat{background:var(--surface-2);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:16px;text-align:center}
+.hstat .hlbl{font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.hstat .hval{font-size:32px;font-weight:800;line-height:1}
+.hstat.total .hval{color:var(--text)}
+.hstat.active .hval{color:var(--primary-dark)}
+.hstat.inactive .hval{color:var(--danger)}
+
+/* ── Chart section ── */
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-xl);padding:24px;margin-bottom:20px;box-shadow:var(--shadow-xs)}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.card-title{font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px}
+.card-hint{font-size:12px;color:var(--text-3);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:4px 11px}
 .chart-wrap{position:relative;height:200px}
 
 /* ── Day panel ── */
-.day-panel{background:#f0fff4;border:1px solid #c6f6d5;border-radius:16px;padding:24px;margin-top:20px;display:none;animation:fadeIn .3s ease}
-.day-panel.show{display:block}
-.day-panel-header{display:flex;align-items:center;gap:10px;margin-bottom:18px}
-.day-panel-dot{width:10px;height:10px;background:#25d366;border-radius:50%;box-shadow:0 0 6px #25d36660}
-.day-panel-title{font-size:14px;font-weight:600;color:#25a244}
-.day-member{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #c6f6d5}
+#day-panel{background:var(--primary-light);border:1px solid rgba(34,197,94,.25);border-radius:var(--radius-lg);padding:20px;margin-top:18px;display:none;animation:fadeIn .25s ease}
+#day-panel.show{display:block}
+.day-panel-hdr{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.day-dot{width:8px;height:8px;background:var(--primary);border-radius:50%;box-shadow:0 0 6px rgba(34,197,94,.6);flex-shrink:0}
+#day-panel-title{font-size:13px;font-weight:700;color:var(--primary-dark)}
+.day-member{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(34,197,94,.15)}
 .day-member:last-child{border-bottom:none}
-.day-av{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;color:#fff}
+.day-av{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;color:#fff}
 .day-info{flex:1;min-width:0}
-.day-name{font-size:13px;color:#2d3748;font-weight:600}
-.day-num{font-size:11px;color:#a0aec0;margin-top:1px}
-.day-msg{font-size:12px;color:#718096;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.day-time{font-size:11px;color:#a0aec0;text-align:right;flex-shrink:0}
-.no-activity{text-align:center;padding:28px;color:#cbd5e0;font-size:13px}
+.day-name{font-size:13px;color:var(--text);font-weight:600}
+.day-num{font-size:11px;color:var(--text-3);margin-top:1px}
+.day-msg{font-size:12px;color:var(--text-2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.day-time{font-size:11px;color:var(--text-3);flex-shrink:0;text-align:right}
+.no-activity{text-align:center;padding:24px;color:var(--text-3);font-size:13px}
+.day-sender-hdr{display:flex;align-items:center;gap:8px;margin:14px 0 4px;font-size:12px;font-weight:700;color:var(--text)}
+.day-sender-hdr:first-child{margin-top:0}
+.day-msg-row{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:3px 0 3px 42px;font-size:13px;color:var(--text-2)}
+.day-msg-body{flex:1;line-height:1.45;word-break:break-word}
+.day-msg-time{font-size:10px;color:var(--text-3);flex-shrink:0;padding-top:2px}
 
 /* ── Members section ── */
-.members-section{background:#fff;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;box-shadow:0 1px 4px #00000008}
-.members-header{padding:20px 24px;border-bottom:1px solid #edf2f7;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.members-header .section-title{margin:0}
-.search-input{flex:1;min-width:160px;background:#f7fafc;border:1px solid #e2e8f0;border-radius:10px;padding:9px 14px;color:#2d3748;font-size:13px;outline:none;font-family:inherit;transition:.2s}
-.search-input:focus{border-color:#25d36660;background:#fff;box-shadow:0 0 0 3px #25d36610}
-.search-input::placeholder{color:#cbd5e0}
+.members-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-xl);overflow:hidden;box-shadow:var(--shadow-xs)}
+.members-hdr{padding:18px 20px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.members-hdr .card-title{flex-shrink:0}
+.members-hdr .search-wrap{flex:1;min-width:140px}
 .filter-btns{display:flex;gap:6px}
-.fbtn{padding:7px 14px;border-radius:10px;border:1px solid #e2e8f0;background:#f7fafc;color:#718096;font-size:12px;font-weight:500;cursor:pointer;transition:.15s;font-family:inherit}
-.fbtn:hover{border-color:#25d36650;color:#25a244;background:#f0fff4}
-.fbtn.active{background:linear-gradient(135deg,#25d366,#128c7e);border-color:transparent;color:#fff;font-weight:700}
+.fbtn{padding:6px 13px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface-2);color:var(--text-2);font-size:12px;font-weight:500;cursor:pointer;transition:.15s;font-family:inherit}
+.fbtn:hover{border-color:var(--primary);color:var(--primary-dark);background:var(--primary-light)}
+.fbtn.active{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:700}
 table{width:100%;border-collapse:collapse}
-thead th{text-align:left;padding:12px 20px;font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:#a0aec0;background:#f7fafc;border-bottom:1px solid #edf2f7;font-weight:600}
-tbody tr{border-bottom:1px solid #edf2f7;transition:.15s;cursor:default}
-tbody tr:hover{background:#f7fafc}
-td{padding:13px 20px;font-size:13px;vertical-align:middle}
-.m-avatar{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;color:#fff}
-.m-info{display:flex;align-items:center;gap:12px}
-.m-name{font-weight:600;color:#2d3748}
-.m-number{font-size:11px;color:#a0aec0;margin-top:2px}
-.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600}
-.badge.active{background:#f0fff4;color:#25a244;border:1px solid #c6f6d5}
-.badge.inactive{background:#fff5f5;color:#e53e3e;border:1px solid #fed7d7}
-.badge.nodata{background:#f7fafc;color:#a0aec0;border:1px solid #e2e8f0}
-.dot{width:6px;height:6px;border-radius:50%;display:inline-block}
-.dot.g{background:#25d366}.dot.r{background:#e53e3e}.dot.grey{background:#a0aec0}
-.last-msg{max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#a0aec0}
-.t-time{font-size:11px;color:#cbd5e0;white-space:nowrap}
-.empty-row td{text-align:center;padding:48px;color:#cbd5e0;font-size:14px}
+thead th{text-align:left;padding:11px 18px;font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--text-3);background:var(--surface-2);border-bottom:1px solid var(--border-light);font-weight:600}
+tbody tr{border-bottom:1px solid var(--border-light);transition:.12s;cursor:default}
+tbody tr:hover{background:var(--surface-2)}
+tbody tr.clickable-row{cursor:pointer}
+tbody tr.clickable-row:hover{background:var(--primary-light)}
+td{padding:12px 18px;font-size:13px;vertical-align:middle;color:var(--text)}
+.m-info{display:flex;align-items:center;gap:11px}
+.m-avatar{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;color:#fff}
+.m-name{font-weight:600;color:var(--text)}
+.m-number{font-size:11px;color:var(--text-3);margin-top:2px}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.badge.active{background:var(--primary-light);color:var(--primary-dark);border:1px solid rgba(34,197,94,.3)}
+.badge.inactive{background:var(--danger-light);color:var(--danger);border:1px solid rgba(239,68,68,.3)}
+.badge.nodata{background:var(--surface-2);color:var(--text-3);border:1px solid var(--border)}
+.badge.warn{background:var(--warning-light);color:var(--warning);border:1px solid rgba(245,158,11,.3)}
+.dot{width:5px;height:5px;border-radius:50%;display:inline-block;flex-shrink:0}
+.dot.g{background:var(--primary)}.dot.r{background:var(--danger)}.dot.grey{background:var(--text-3)}
+.last-msg{max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-3)}
+.t-time{font-size:11px;color:var(--text-3);white-space:nowrap}
+.empty-row td{text-align:center;padding:44px;color:var(--text-3);font-size:14px}
+.row-num{font-size:12px;font-weight:600;color:var(--text-3)}
+
+/* ── Member Messages page ── */
+.member-content{flex:1;overflow-y:auto;padding:24px;max-width:760px;width:100%;margin:0 auto}
+.stat-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;text-align:center;box-shadow:var(--shadow-xs)}
+.stat-val{font-size:28px;font-weight:800;color:var(--primary-dark)}
+.stat-lbl{font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-top:3px}
+.week-dots{display:flex;gap:6px;justify-content:center;margin-bottom:20px}
+.wdot{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-direction:column;gap:1px}
+.wdot.on{background:var(--primary-light);border:1px solid rgba(34,197,94,.3);color:var(--primary-dark)}
+.wdot.off{background:var(--danger-light);border:1px solid rgba(239,68,68,.3);color:var(--danger)}
+.msg-search-wrap{margin-bottom:16px}
+.msg-search{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;outline:none;font-family:inherit;background:var(--surface-2);color:var(--text);transition:.2s}
+.msg-search:focus{border-color:var(--primary);background:var(--surface);box-shadow:0 0 0 3px rgba(34,197,94,.1)}
+.msg-search::placeholder{color:var(--text-3)}
+
+/* ── Message bubbles ── */
+.msg-bubble{display:flex;flex-direction:column;margin-bottom:12px}
+.msg-bubble.from-me{align-items:flex-end}
+.msg-bubble.from-other{align-items:flex-start}
+.msg-box{max-width:72%;padding:10px 14px;border-radius:var(--radius-lg);font-size:13px;line-height:1.55;word-break:break-word}
+.msg-bubble.from-me .msg-box{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;border-bottom-right-radius:4px}
+.msg-bubble.from-other .msg-box{background:var(--surface);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:4px;box-shadow:var(--shadow-xs)}
+.msg-time{font-size:10px;margin-top:4px;color:var(--text-3)}
+.msg-bubble.from-me .msg-time{text-align:right}
+.doc-download{display:inline-flex;align-items:center;gap:8px;margin-top:6px;padding:8px 12px;background:rgba(255,255,255,.2);border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,.35)}
+.msg-bubble.from-other .doc-download{background:var(--surface-2);border:1px solid var(--border);color:var(--text)}
+.msg-bubble.from-me .doc-download{color:#fff}
+.msg-img{max-width:240px;border-radius:10px;margin-top:6px;cursor:pointer}
+.no-msgs{text-align:center;padding:56px 20px;color:var(--text-3);font-size:14px}
+.date-divider{display:flex;align-items:center;gap:10px;margin:18px 0 10px;color:var(--text-3);font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}.date-divider::before,.date-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ── Modals ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+.modal-overlay.show{display:flex}
+.modal-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-xl);padding:28px;max-width:700px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 24px 48px rgba(0,0,0,.18)}
+.modal-title{font-size:17px;font-weight:800;color:var(--text);margin-bottom:20px;display:flex;align-items:center;justify-content:space-between}
+.modal-close{cursor:pointer;font-size:18px;color:var(--text-3);background:var(--surface-2);border:1px solid var(--border);padding:4px 8px;border-radius:8px;line-height:1;transition:.15s;font-family:inherit}
+.modal-close:hover{background:var(--danger-light);color:var(--danger);border-color:rgba(239,68,68,.3)}
+.cmp-table{width:100%;border-collapse:collapse;font-size:13px}
+.cmp-table th{text-align:left;padding:10px 14px;color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:.6px;border-bottom:2px solid var(--border)}
+.cmp-row{border-bottom:1px solid var(--border-light);transition:.12s}
+.cmp-row:hover{background:var(--surface-2)}
+.cmp-row td{padding:12px 14px;color:var(--text)}
+.cmp-bar{height:6px;background:var(--surface-2);border-radius:99px;overflow:hidden;width:80px;display:inline-block;vertical-align:middle;margin-left:6px}
+.cmp-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--primary),var(--primary-dark))}
+.sum-row{padding:14px;border-bottom:1px solid var(--border-light);cursor:pointer;transition:.12s}
+.sum-row:hover{background:var(--surface-2)}
+.sum-date{font-weight:700;color:var(--text);font-size:14px;margin-bottom:8px}
+.sum-groups{display:flex;flex-wrap:wrap;gap:6px}
+.sum-chip{background:var(--primary-light);border:1px solid rgba(34,197,94,.3);color:var(--primary-dark);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:600}
 
 /* ── Toast ── */
-.toast{position:fixed;bottom:28px;right:28px;background:#fff5f5;border:1px solid #fed7d7;color:#c53030;padding:14px 20px;border-radius:14px;font-size:13px;display:none;z-index:99;box-shadow:0 8px 32px #00000015;animation:fadeIn .3s ease}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--danger-light);border:1px solid rgba(239,68,68,.3);color:var(--danger);padding:13px 18px;border-radius:var(--radius-lg);font-size:13px;display:none;z-index:99;box-shadow:var(--shadow-lg);animation:fadeIn .25s ease;font-weight:500}
+
+/* ── Search overlay ── */
+.search-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:none;align-items:flex-start;justify-content:center;padding-top:80px}
+.search-overlay.show{display:flex}
+.search-box{background:var(--surface);border-radius:var(--radius-xl);padding:24px;width:100%;max-width:640px;box-shadow:0 20px 60px rgba(0,0,0,.2);max-height:80vh;display:flex;flex-direction:column}
+.search-box-input{width:100%;padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);font-size:15px;outline:none;font-family:inherit;background:var(--surface-2);color:var(--text);margin-bottom:12px}
+.search-box-input:focus{border-color:var(--primary)}
+.search-results{overflow-y:auto;flex:1}
+.search-result{padding:12px;border-radius:var(--radius);cursor:pointer;margin-bottom:4px;transition:.15s}
+.search-result:hover{background:var(--surface-2)}
+.sr-group{font-size:10px;font-weight:700;color:var(--primary-dark);text-transform:uppercase;letter-spacing:.5px}
+.sr-sender{font-size:12px;color:var(--text-2);margin:2px 0}
+.sr-body{font-size:13px;color:var(--text)}
+.sr-time{font-size:10px;color:var(--text-3);float:right}
+.sr-highlight{background:var(--warning-light);border-radius:3px;padding:0 2px;color:var(--text)}
+
+/* ── Email / settings modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:none;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--surface);border-radius:var(--radius-xl);padding:28px;width:100%;max-width:460px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal-title{font-size:16px;font-weight:700;color:var(--text);margin-bottom:20px}
+.modal-field{margin-bottom:14px}
+.modal-label{font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px;display:block}
+.modal-input{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;outline:none;font-family:inherit;background:var(--surface-2);color:var(--text);box-sizing:border-box}
+.modal-input:focus{border-color:var(--primary)}
+.modal-row{display:flex;gap:10px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+
+/* ── Message type pills ── */
+.type-strip{display:flex;flex-wrap:wrap;gap:8px;padding:14px 0 4px}
+.type-pill{display:flex;align-items:center;gap:5px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:12px;font-weight:600;color:var(--text-2)}
+.type-pill span{font-size:14px}
+
+/* ── Refresh indicator ── */
+.refresh-chip{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-3);padding:4px 10px;border-radius:20px;background:var(--surface-2);border:1px solid var(--border)}
+
+/* ── Nav tabs ── */
+.nav-divider{width:1px;height:20px;background:var(--border);margin:0 6px;flex-shrink:0}
+.nav-tabs{display:flex;gap:2px;background:var(--surface-2);border-radius:var(--radius);padding:3px;border:1px solid var(--border)}
+.nav-tab{padding:5px 16px;border-radius:8px;border:none;background:transparent;font-size:13px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;transition:.15s;white-space:nowrap}
+.nav-tab:hover{color:var(--text)}
+.nav-tab.active{background:var(--surface);color:var(--primary-dark);box-shadow:var(--shadow-xs)}
+
+/* ── Contacts page ── */
+.section-hdr{display:flex;align-items:center;gap:10px;margin:28px 0 14px}
+.section-hdr-title{font-size:15px;font-weight:700;color:var(--text)}
+.section-count{border-radius:20px;padding:2px 10px;font-size:12px;font-weight:700}
+.active-hdr .section-count{background:var(--primary-light);color:var(--primary-dark);border:1px solid rgba(34,197,94,.3)}
+.inactive-hdr .section-count{background:var(--surface-2);color:var(--text-3);border:1px solid var(--border)}
+.contact-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 18px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-xs);margin-bottom:8px}
+.contact-card:hover{transform:translateX(3px);box-shadow:var(--shadow);border-color:var(--primary)}
+.inactive-card:hover{border-color:var(--text-3)}
+.cc-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:#fff;flex-shrink:0;text-shadow:0 1px 2px rgba(0,0,0,.3)}
+.cc-info{flex:1;min-width:0}
+.cc-name{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc-phone{font-size:11px;color:var(--text-3);margin-top:2px}
+.cc-right{text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.cc-lastmsg{font-size:11px;color:var(--text-3)}
+.cc-stat{font-size:11px;color:var(--primary-dark);font-weight:600}
+.inactive-card .cc-stat{color:var(--text-3)}
+.cc-badge-act{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;background:var(--primary-light);color:var(--primary-dark);border:1px solid rgba(34,197,94,.25)}
+.cc-badge-ina{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;background:var(--surface-2);color:var(--text-3);border:1px solid var(--border)}
+
+/* ── Contact detail ── */
+.cd-hero{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-xl);padding:24px;margin-bottom:20px;position:relative;overflow:hidden;box-shadow:var(--shadow-xs)}
+.cd-hero::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--primary),var(--accent),var(--primary))}
+.cd-hero-top{display:flex;align-items:center;gap:16px;margin-bottom:20px}
+.cd-big-avatar{width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;flex-shrink:0;box-shadow:0 4px 12px rgba(0,0,0,.2);text-shadow:0 1px 2px rgba(0,0,0,.3)}
+.cd-name{font-size:22px;font-weight:800;color:var(--text);letter-spacing:-.3px}
+.cd-phone-text{font-size:14px;color:var(--text-3);margin-top:4px}
+.cd-groups-label{font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.cd-groups-row{display:flex;flex-wrap:wrap;gap:8px}
+.cd-group-chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:7px 12px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;transition:.15s}
+.cd-group-chip:hover{border-color:var(--primary);color:var(--primary-dark);background:var(--primary-light)}
+.cd-group-chip.has-msgs{background:var(--primary-light);border-color:rgba(34,197,94,.35);color:var(--primary-dark)}
+.cd-week-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-xl);padding:24px;margin-bottom:20px;box-shadow:var(--shadow-xs)}
+.cd-week-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.cd-week-hint{font-size:11px;font-weight:400;color:var(--text-3)}
+.cd-day-strip{display:flex;gap:8px}
+.cd-day-btn{flex:1;padding:12px 6px;border-radius:var(--radius);border:2px solid transparent;background:var(--surface-2);cursor:pointer;text-align:center;transition:all .15s;font-family:inherit;min-width:0}
+.cd-day-btn.has-msgs{background:var(--primary-light);border-color:rgba(34,197,94,.3)}
+.cd-day-btn.no-msgs{opacity:.4;cursor:default}
+.cd-day-btn.has-msgs:hover{border-color:var(--primary);transform:translateY(-2px);box-shadow:var(--shadow)}
+.cd-day-btn.sel{border-color:var(--primary)!important;box-shadow:0 0 0 3px rgba(34,197,94,.18);transform:translateY(-2px)}
+.cd-day-name{font-size:10px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.3px}
+.cd-day-lbl{font-size:9px;color:var(--text-3);margin-top:2px}
+.cd-day-count{font-size:20px;font-weight:800;margin-top:6px;color:var(--text-3)}
+.cd-day-btn.has-msgs .cd-day-count{color:var(--primary-dark)}
+.cd-msgs-panel{background:var(--primary-light);border:1px solid rgba(34,197,94,.2);border-radius:var(--radius-lg);padding:20px;margin-top:18px;display:none;animation:fadeIn .25s ease}
+.cd-msgs-panel.show{display:block}
+.cd-msgs-panel-title{font-size:13px;font-weight:700;color:var(--primary-dark);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.cd-grp-hdr{font-size:10px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;padding:8px 0 4px;display:flex;align-items:center;gap:8px}
+.cd-grp-hdr::after{content:'';flex:1;height:1px;background:rgba(34,197,94,.2)}
+.cd-msg-item{background:var(--surface);border-radius:var(--radius);padding:10px 14px;margin-bottom:6px;border:1px solid var(--border-light);box-shadow:var(--shadow-xs)}
+.cd-msg-body-text{font-size:13px;color:var(--text);line-height:1.5;word-break:break-word}
+.cd-msg-time-text{font-size:10px;color:var(--text-3);margin-top:4px}
+.no-cd-msgs{text-align:center;padding:24px;color:var(--text-3);font-size:13px}
+.contacts-empty{text-align:center;padding:32px;color:var(--text-3);font-size:13px}
 </style>
 </head>
 <body>
 
-<!-- Loading -->
+<!-- ── Loading ── -->
 <div id="page-loading" class="page active">
-  <div class="spinner-wrap">
-    <div class="spinner-ring"></div>
-    <div class="spinner-ring spinner-ring2"></div>
-    <div class="wa-icon-center">💬</div>
-  </div>
+  <div class="spinner"></div>
   <div class="loading-title">WhatsApp Monitor</div>
-  <div class="loading-text">Connecting to WhatsApp...</div>
+  <div class="loading-text">Connecting...</div>
 </div>
 
-<!-- QR -->
-<div id="page-qr" class="page" style="min-height:100vh;background:radial-gradient(ellipse at 30% 50%,#0d2218 0%,#080b12 60%)">
+<!-- ── QR ── -->
+<div id="page-qr" class="page">
   <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px">
-    <div class="qr-outer">
-      <div class="qr-glow"></div>
-      <div class="qr-card">
-        <div class="qr-logo-wrap">💬</div>
-        <h2>Link Your WhatsApp</h2>
-        <p>Scan the QR code below with your phone<br/>to connect the activity monitor</p>
-        <div id="qr-waiting" class="qr-waiting">
-          <div class="spinner-ring" style="width:36px;height:36px;border-width:2px"></div>
-          <span style="color:#1e2d3d;font-size:12px">Generating QR code...</span>
-        </div>
-        <img id="qr-img" src="" alt="QR Code"/>
-        <div class="steps">
-          <div class="step"><div class="step-num">1</div>Open WhatsApp on your phone</div>
-          <div class="step"><div class="step-num">2</div>Tap ⋮ → Linked Devices → Link a Device</div>
-          <div class="step"><div class="step-num">3</div>Point your phone at the QR code above</div>
-        </div>
+    <div class="qr-card">
+      <div class="qr-logo">💬</div>
+      <h2>Link Your WhatsApp</h2>
+      <p>Scan the QR code with your phone<br/>to connect the activity monitor</p>
+      <div id="qr-waiting">
+        <div class="spinner" style="width:32px;height:32px;border-width:2px"></div>
+        <span>Generating QR...</span>
+      </div>
+      <img id="qr-img" src="" alt="QR Code"/>
+      <div class="qr-steps">
+        <div class="qr-step"><div class="step-num">1</div>Open WhatsApp on your phone</div>
+        <div class="qr-step"><div class="step-num">2</div>Tap ⋮ → Linked Devices → Link a Device</div>
+        <div class="qr-step"><div class="step-num">3</div>Point your phone at the QR code above</div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Groups -->
+<!-- ── Groups ── -->
 <div id="page-groups" class="page">
-  <div class="app-header">
-    <div class="header-left">
-      <div class="header-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.978-1.406A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z" fill="#25d366"/>
-          <path d="M8.5 8.5c.2-.5.45-.52.64-.53h.52c.18 0 .43.07.66.52.26.52.82 2 .9 2.14.08.14.13.3.03.48-.1.18-.15.3-.3.46-.14.17-.3.37-.43.5-.14.14-.29.29-.12.57.17.28.74 1.22 1.59 1.97.76.67 1.42.91 1.68 1.02.26.1.41.09.57-.05.17-.14.69-.8.87-1.08.18-.28.37-.24.62-.14.25.1 1.6.75 1.87.89.27.14.46.2.53.32.07.12.07.7-.17 1.37-.23.67-1.38 1.28-1.87 1.33-.5.05-.98.22-3.3-.69-2.78-1.08-4.54-3.9-4.68-4.07-.14-.18-1.12-1.5-1.12-2.86 0-1.36.7-2.03.96-2.3z" fill="#fff"/>
-        </svg>
+  <nav class="navbar">
+    <div class="nav-left">
+      <div class="nav-logo">💬</div>
+      <div class="nav-brand">
+        <div class="nav-title">WhatsApp Monitor</div>
+        <div class="nav-sub">Activity Dashboard</div>
       </div>
-      <div>
-        <div class="header-title">WhatsApp <span style="font-weight:400;opacity:.85">Monitor</span></div>
-        <div class="header-subtitle">Group Activity Dashboard</div>
+      <div class="nav-divider"></div>
+      <div class="nav-tabs">
+        <button class="nav-tab active">👥 Groups</button>
+        <button class="nav-tab" onclick="showContacts()">📱 Contacts</button>
       </div>
     </div>
-    <div class="header-right">
-      <div class="header-badge"><div class="live-dot"></div> Live</div>
-      <button class="logout-btn" onclick="logout()">⏻ Logout</button>
+    <div class="nav-right">
+      <button class="btn" onclick="openSearch()">🔍 Search</button>
+      <button class="btn" onclick="showSummaries()">📋 Summaries</button>
+      <button class="btn" onclick="showComparison()">⚖️ Compare</button>
+      <button class="btn" onclick="openEmailSettings()">⚙️ Email</button>
+      <button class="btn btn-icon" onclick="toggleDark()" id="dark-btn" title="Toggle dark mode">🌙</button>
+      <div class="live-chip"><div class="live-dot"></div> Live</div>
+      <div class="refresh-chip" id="refresh-chip">↻ just now</div>
+      <button class="btn btn-danger" onclick="logout()">⏻ Logout</button>
     </div>
-  </div>
-  <div class="groups-body">
-    <div class="page-header">
-      <div>
-        <div class="page-title">Your Groups</div>
-        <div class="page-sub" id="groups-sub">Loading...</div>
+  </nav>
+  <div class="content">
+    <div class="page-hdr">
+      <div class="page-hdr-left">
+        <h1>Your Groups</h1>
+        <p id="groups-sub">Loading...</p>
       </div>
-      <div style="display:flex;gap:10px;align-items:center">
-        <button onclick="refreshGroups()" style="padding:8px 16px;border-radius:10px;border:1px solid #25d366;background:#fff;color:#128c7e;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit" id="refresh-btn">↻ Refresh</button>
-        <div class="search-wrap">
-          <span class="search-icon">🔍</span>
-          <input class="group-search" id="group-search" placeholder="Search groups..." oninput="filterGroups()"/>
+      <div class="page-hdr-right">
+        <button class="btn btn-primary" onclick="refreshGroups()" id="refresh-btn">↻ Refresh</button>
+      </div>
+    </div>
+
+    <div id="summary-strip">
+      <div class="kpi-card">
+        <div class="kpi-icon blue">👥</div>
+        <div>
+          <div class="kpi-val" id="s-total">0</div>
+          <div class="kpi-lbl">Total Groups</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon green">✅</div>
+        <div>
+          <div class="kpi-val" id="s-active" style="color:var(--primary-dark)">0</div>
+          <div class="kpi-lbl">Active Today</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon purple">👤</div>
+        <div>
+          <div class="kpi-val" id="s-members" style="color:var(--accent)">0</div>
+          <div class="kpi-lbl">Total Members</div>
         </div>
       </div>
     </div>
-    <div class="summary-strip" id="summary-strip" style="display:none">
-      <div class="strip-card"><div class="strip-icon blue">👥</div><div><div class="strip-val" id="s-total">0</div><div class="strip-lbl">Total Groups</div></div></div>
-      <div class="strip-card"><div class="strip-icon green">✅</div><div><div class="strip-val" id="s-active" style="color:#25d366">0</div><div class="strip-lbl">Groups with Activity</div></div></div>
-      <div class="strip-card"><div class="strip-icon purple">👤</div><div><div class="strip-val" id="s-members" style="color:#a78bfa">0</div><div class="strip-lbl">Total Members</div></div></div>
+
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input class="search-input" id="group-search" placeholder="Search groups..." oninput="filterGroups()"/>
+      </div>
+      <select class="sort-select" id="sort-select">
+        <option value="default">All Groups</option>
+        <option value="most-active">Most Active</option>
+        <option value="least-active">Least Active</option>
+        <option value="largest">Largest</option>
+        <option value="smallest">Smallest</option>
+      </select>
+      <div class="filter-pills">
+        <button class="pill active" onclick="filterByActivity('all',this)">All</button>
+        <button class="pill" onclick="filterByActivity('high',this)">🟢 Active</button>
+        <button class="pill" onclick="filterByActivity('low',this)">🔴 Low</button>
+      </div>
     </div>
-    <div class="groups-grid" id="groups-grid"></div>
+
+    <div id="groups-grid"></div>
   </div>
 </div>
 
-<!-- Group Detail -->
-<div id="page-group" class="page">
-  <div class="app-header">
-    <div class="header-left">
-      <button class="back-btn" onclick="showGroups()">← Back</button>
-      <div>
-        <div class="header-title" id="detail-title">Group</div>
+<!-- ── Contacts ── -->
+<div id="page-contacts" class="page">
+  <nav class="navbar">
+    <div class="nav-left">
+      <div class="nav-logo">💬</div>
+      <div class="nav-brand">
+        <div class="nav-title">WhatsApp Monitor</div>
+        <div class="nav-sub">Activity Dashboard</div>
+      </div>
+      <div class="nav-divider"></div>
+      <div class="nav-tabs">
+        <button class="nav-tab" onclick="showGroups()">👥 Groups</button>
+        <button class="nav-tab active">📱 Contacts</button>
       </div>
     </div>
-    <div class="header-right">
-      <div class="header-badge"><div class="live-dot"></div> Live</div>
-      <button class="logout-btn" onclick="logout()">⏻ Logout</button>
+    <div class="nav-right">
+      <button class="btn btn-icon" onclick="toggleDark()" id="dark-btn" title="Toggle dark mode">🌙</button>
+      <div class="live-chip"><div class="live-dot"></div> Live</div>
+      <button class="btn btn-danger" onclick="logout()">⏻ Logout</button>
+    </div>
+  </nav>
+  <div class="content">
+    <div class="page-hdr">
+      <div class="page-hdr-left">
+        <h1>Contacts</h1>
+        <p id="contacts-sub">Loading...</p>
+      </div>
+      <div class="page-hdr-right">
+        <button class="btn btn-primary" onclick="loadContacts()">↻ Refresh</button>
+      </div>
+    </div>
+    <div class="toolbar" style="margin-bottom:4px">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input class="search-input" id="contacts-search" placeholder="Search by name or number…" oninput="filterContacts()"/>
+      </div>
+      <div class="filter-pills">
+        <button class="pill active" id="cf-all"      onclick="setContactFilter('all',this)">All</button>
+        <button class="pill"        id="cf-active"   onclick="setContactFilter('active',this)">🟢 Active</button>
+        <button class="pill"        id="cf-inactive" onclick="setContactFilter('inactive',this)">⚫ Inactive</button>
+      </div>
+      <select class="sort-select" id="contacts-sort" onchange="filterContacts()">
+        <option value="recent">Most Recent</option>
+        <option value="messages">Most Messages</option>
+        <option value="groups">Most Groups</option>
+        <option value="name-az">Name A → Z</option>
+        <option value="name-za">Name Z → A</option>
+      </select>
+    </div>
+
+    <!-- Active contacts -->
+    <div id="active-contacts-section">
+      <div class="section-hdr active-hdr">
+        <span style="font-size:18px">🟢</span>
+        <div class="section-hdr-title">Active Contacts</div>
+        <div class="section-count" id="active-count">0</div>
+        <span style="font-size:11px;color:var(--text-3)">sent messages in the last 7 days</span>
+      </div>
+      <div id="active-contacts-list"></div>
+    </div>
+
+    <!-- Inactive contacts -->
+    <div id="inactive-contacts-section">
+      <div class="section-hdr inactive-hdr">
+        <span style="font-size:18px">⚫</span>
+        <div class="section-hdr-title">Inactive Contacts</div>
+        <div class="section-count" id="inactive-count">0</div>
+        <span style="font-size:11px;color:var(--text-3)">no messages in the last 7 days</span>
+      </div>
+      <div id="inactive-contacts-list"></div>
     </div>
   </div>
-  <div class="group-body">
-    <div class="detail-hero">
-      <div class="detail-hero-top">
-        <div class="detail-avatar" id="detail-avatar">👥</div>
+</div>
+
+<!-- ── Contact Detail ── -->
+<div id="page-contact-detail" class="page">
+  <nav class="navbar">
+    <div class="nav-left">
+      <button class="btn" onclick="showContacts()">← Back</button>
+      <div id="cd-nav-avatar" class="m-avatar" style="width:36px;height:36px;border-radius:50%;font-size:14px;margin-left:8px;flex-shrink:0"></div>
+      <div style="margin-left:8px">
+        <div class="nav-title" id="cd-nav-name">Contact</div>
+        <div class="nav-sub" id="cd-nav-phone"></div>
+      </div>
+    </div>
+    <div class="nav-right">
+      <div class="live-chip"><div class="live-dot"></div> Live</div>
+      <button class="btn btn-danger" onclick="logout()">⏻ Logout</button>
+    </div>
+  </nav>
+  <div class="detail-content">
+
+    <!-- Hero card -->
+    <div class="cd-hero">
+      <div class="cd-hero-top">
+        <div id="cd-big-avatar" class="cd-big-avatar"></div>
         <div>
-          <div class="detail-name" id="detail-name">—</div>
-          <div class="detail-meta" id="detail-meta">—</div>
+          <div class="cd-name" id="cd-name">—</div>
+          <div class="cd-phone-text" id="cd-phone-text">—</div>
+          <div id="cd-status-badge" style="margin-top:8px"></div>
         </div>
       </div>
-      <div class="detail-stats">
-        <div class="dstat total"><div class="dlbl">Total Members</div><div class="dval" id="d-total">—</div></div>
-        <div class="dstat active"><div class="dlbl">Active Today</div><div class="dval" id="d-active">—</div></div>
-        <div class="dstat inactive"><div class="dlbl">Inactive Today</div><div class="dval" id="d-inactive">—</div></div>
+      <div class="cd-groups-label">📍 In these groups</div>
+      <div class="cd-groups-row" id="cd-groups-row"></div>
+    </div>
+
+    <!-- 7-day activity strip -->
+    <div class="cd-week-card">
+      <div class="cd-week-title">
+        📅 Last 7 Days Activity
+        <span class="cd-week-hint">— click any day to see messages</span>
+      </div>
+      <div class="cd-day-strip" id="cd-day-strip"></div>
+      <div class="cd-msgs-panel" id="cd-msgs-panel">
+        <div class="cd-msgs-panel-title" id="cd-msgs-panel-title">📨 Messages</div>
+        <div id="cd-msgs-list"></div>
       </div>
     </div>
 
-    <div class="chart-section">
-      <div class="section-header">
-        <div class="section-title">📊 Weekly Activity</div>
-        <div class="section-hint">Click a bar to see members</div>
+  </div>
+</div>
+
+<!-- ── Group Detail ── -->
+<div id="page-group" class="page">
+  <nav class="navbar">
+    <div class="nav-left">
+      <button class="btn" onclick="showGroups()">← Back</button>
+      <div class="nav-title" id="detail-title" style="margin-left:4px"></div>
+    </div>
+    <div class="nav-right">
+      <button class="btn" onclick="exportCSV()">📥 CSV</button>
+      <button class="btn" onclick="exportPDF('daily')">📄 Daily PDF</button>
+      <button class="btn" onclick="exportPDF('weekly')">📄 Weekly PDF</button>
+      <div class="live-chip"><div class="live-dot"></div> Live</div>
+      <button class="btn btn-danger" onclick="logout()">⏻ Logout</button>
+    </div>
+  </nav>
+  <div class="detail-content">
+
+    <div class="hero-card">
+      <div class="hero-top">
+        <div id="detail-avatar"></div>
+        <div>
+          <div id="detail-name">—</div>
+          <div id="detail-meta">—</div>
+        </div>
+      </div>
+      <div class="hero-stats">
+        <div class="hstat total">
+          <div class="hlbl">Total Members</div>
+          <div class="hval" id="d-total">—</div>
+        </div>
+        <div class="hstat active">
+          <div class="hlbl">Active Today</div>
+          <div class="hval" id="d-active">—</div>
+        </div>
+        <div class="hstat inactive">
+          <div class="hlbl">Inactive Today</div>
+          <div class="hval" id="d-inactive">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card" id="type-card" style="display:none">
+      <div class="card-title" style="margin-bottom:0">📨 Message Types (last 7 days)</div>
+      <div class="type-strip" id="type-strip"></div>
+    </div>
+
+    <div class="chart-card">
+      <div class="card-header">
+        <div class="card-title">📊 Weekly Activity</div>
+        <div class="card-hint">Click a bar to see members</div>
       </div>
       <div class="chart-wrap"><canvas id="weekChart"></canvas></div>
-      <div class="day-panel" id="day-panel">
-        <div class="day-panel-header">
-          <div class="day-panel-dot"></div>
-          <div class="day-panel-title" id="day-panel-title"></div>
+      <div id="day-panel">
+        <div class="day-panel-hdr">
+          <div class="day-dot"></div>
+          <div id="day-panel-title"></div>
         </div>
         <div id="day-panel-members"></div>
       </div>
     </div>
 
-    <div class="members-section">
-      <div class="members-header">
-        <div class="section-title">👤 Members</div>
-        <input class="search-input" id="member-search" placeholder="Search name or number…" oninput="renderMembers()"/>
+    <div class="members-card">
+      <div class="members-hdr">
+        <div class="card-title">👤 Members</div>
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input class="search-input" id="member-search" placeholder="Search name or number…" oninput="renderMembers()"/>
+        </div>
         <div class="filter-btns">
           <button class="fbtn active" onclick="setFilter('all',this)">All</button>
           <button class="fbtn" onclick="setFilter('active',this)">✅ Active</button>
@@ -311,14 +727,120 @@ td{padding:13px 20px;font-size:13px;vertical-align:middle}
         </div>
       </div>
       <table>
-        <thead><tr><th>#</th><th>Member</th><th>Status</th><th>Last Message</th><th>Last Seen</th></tr></thead>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Member</th>
+            <th>Status</th>
+            <th>Last Message</th>
+            <th>Last Seen</th>
+          </tr>
+        </thead>
         <tbody id="members-tbody"></tbody>
       </table>
     </div>
+
+  </div>
+</div>
+
+<!-- ── Member Messages ── -->
+<div id="page-member" class="page">
+  <nav class="navbar">
+    <div class="nav-left">
+      <button class="btn" onclick="showPage('page-group')">← Back</button>
+      <div id="member-avatar" class="m-avatar" style="width:36px;height:36px;border-radius:50%;font-size:14px;margin-left:8px"></div>
+      <div style="margin-left:4px">
+        <div class="nav-title" id="member-page-name"></div>
+        <div class="nav-sub" id="member-page-number"></div>
+      </div>
+    </div>
+    <div class="nav-right">
+      <div class="live-chip"><div class="live-dot"></div> Last 24 hrs</div>
+    </div>
+  </nav>
+  <div class="member-content">
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="stat-val" id="mstat-msgs">—</div>
+        <div class="stat-lbl">Messages (7d)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="mstat-days">—</div>
+        <div class="stat-lbl">Active Days</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="mstat-24h">—</div>
+        <div class="stat-lbl">Messages (24h)</div>
+      </div>
+    </div>
+    <div class="week-dots" id="member-week-dots"></div>
+    <input class="msg-search" id="msg-search" placeholder="🔍 Search messages…" oninput="filterMsgs()"/>
+    <div id="member-msgs-list"></div>
+  </div>
+</div>
+
+<!-- ── Compare Modal ── -->
+<div class="modal-overlay" id="modal-compare">
+  <div class="modal-box">
+    <div class="modal-title">
+      ⚖️ Group Comparison
+      <button class="modal-close" onclick="document.getElementById('modal-compare').classList.remove('show')">✕</button>
+    </div>
+    <table class="cmp-table">
+      <thead>
+        <tr>
+          <th>Group</th>
+          <th>Members</th>
+          <th>Active Today</th>
+          <th>Activity %</th>
+        </tr>
+      </thead>
+      <tbody id="cmp-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── Summaries Modal ── -->
+<div class="modal-overlay" id="modal-summaries">
+  <div class="modal-box">
+    <div class="modal-title">
+      📋 Daily Summaries
+      <button class="modal-close" onclick="document.getElementById('modal-summaries').classList.remove('show')">✕</button>
+    </div>
+    <div id="summaries-list"></div>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- Search Overlay -->
+<div class="search-overlay" id="search-overlay" onclick="if(event.target===this)closeSearch()">
+  <div class="search-box">
+    <input class="search-box-input" id="global-search-input" placeholder="Search messages across all groups…" oninput="globalSearch(this.value)"/>
+    <div class="search-results" id="search-results"><div style="text-align:center;color:var(--text-3);padding:32px;font-size:13px">Type at least 2 characters to search</div></div>
+  </div>
+</div>
+
+<!-- Email Settings Modal -->
+<div class="modal-overlay" id="email-modal" onclick="if(event.target===this)closeEmailSettings()">
+  <div class="modal">
+    <div class="modal-title">⚙️ Email Settings</div>
+    <div class="modal-field"><label class="modal-label">SMTP Host</label><input class="modal-input" id="em-host" placeholder="smtp.gmail.com"/></div>
+    <div class="modal-row">
+      <div class="modal-field" style="flex:1"><label class="modal-label">Port</label><input class="modal-input" id="em-port" placeholder="587" type="number"/></div>
+      <div class="modal-field" style="flex:1"><label class="modal-label">User (email)</label><input class="modal-input" id="em-user" placeholder="you@gmail.com"/></div>
+    </div>
+    <div class="modal-field"><label class="modal-label">App Password <span id="em-pass-saved" style="color:var(--primary);font-size:11px"></span></label><input class="modal-input" id="em-pass" placeholder="Enter new password to change" type="password"/></div>
+    <div class="modal-field"><label class="modal-label">Send To (recipient email)</label><input class="modal-input" id="em-to" placeholder="recipient@example.com"/></div>
+    <div class="modal-field"><label class="modal-label">From Name/Email (optional)</label><input class="modal-input" id="em-from" placeholder="WhatsApp Monitor"/></div>
+    <p style="font-size:11px;color:var(--text-3);margin:0 0 8px">For Gmail: enable 2FA → create an App Password → use it here.</p>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeEmailSettings()">Cancel</button>
+      <button class="btn" id="test-email-btn" onclick="sendTestEmail()" style="color:var(--primary);border-color:var(--primary)">📧 Test Email</button>
+      <button class="btn btn-primary" onclick="saveEmailSettings()">Save</button>
+    </div>
+  </div>
+</div>
 
 <script>
 let currentGroup=null,allMembers=[],memberFilter='all',weekChart=null,weekStats=[],allGroups=[];
@@ -327,6 +849,17 @@ const GRAD=[['#e91e8c','#c2185b'],['#2196f3','#1565c0'],['#ff9800','#e65100'],['
 function avatarGrad(n){let h=0;for(const c of n)h=(h*31+c.charCodeAt(0))&0xffff;return GRAD[h%GRAD.length]}
 function avatarLetter(m){return m.name?m.name.trim()[0].toUpperCase():m.number.slice(-2)}
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function renderBody(s){
+  if(!s)return'';
+  let h=esc(s);
+  // clickable links
+  h=h.replace(/(https?:\/\/[^\s<>&"]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:underline;word-break:break-all">$1</a>');
+  // @mentions in blue
+  h=h.replace(/@(\S+)/g,'<span style="color:#2196f3;font-weight:600">@$1</span>');
+  // line breaks
+  h=h.replace(/\n/g,'<br>');
+  return h;
+}
 function fmtTime(iso){if(!iso)return'—';return new Date(iso).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';setTimeout(()=>t.style.display='none',4000)}
 function showPage(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById(id).classList.add('active')}
@@ -351,6 +884,7 @@ async function refreshGroups(){
   await loadGroups();
   btn.textContent='↻ Refresh';btn.disabled=false;
 }
+
 async function loadGroups(){
   const res=await fetch((window.BACKEND_URL||'')+'/api/groups');
   const data=await res.json();
@@ -368,29 +902,56 @@ async function loadGroups(){
 
 function filterGroups(){
   const q=document.getElementById('group-search').value.toLowerCase();
-  renderGroupCards(allGroups.filter(g=>g.name.toLowerCase().includes(q)));
+  renderGroupCards(allGroups.filter(g=>!q||g.name.toLowerCase().includes(q)));
 }
+
+function filterByActivity(level,btn){
+  document.querySelectorAll('.filter-pills .pill').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  const q=document.getElementById('group-search').value.toLowerCase();
+  let filtered=allGroups.filter(g=>!q||g.name.toLowerCase().includes(q));
+  if(level==='high')filtered=filtered.filter(g=>{const pct=g.totalMembers?Math.round(g.activeToday/g.totalMembers*100):0;return pct>=50});
+  else if(level==='mid')filtered=filtered.filter(g=>{const pct=g.totalMembers?Math.round(g.activeToday/g.totalMembers*100):0;return pct>=20&&pct<50});
+  else if(level==='low')filtered=filtered.filter(g=>{const pct=g.totalMembers?Math.round(g.activeToday/g.totalMembers*100):0;return pct<20});
+  renderGroupCards(filtered);
+}
+
+let sortMode='default';
 
 function renderGroupCards(groups){
   const grid=document.getElementById('groups-grid');
-  if(!groups.length){grid.innerHTML='<div class="no-groups" style="grid-column:1/-1"><div class="no-groups-icon">🔍</div><p>No groups match your search</p></div>';return}
-  grid.innerHTML=groups.map(g=>{
-    const [c1,c2]=avatarGrad(g.id);
+  const pins=getPins();
+  let sorted=[...groups].sort((a,b)=>(pins.includes(b.id)?1:0)-(pins.includes(a.id)?1:0));
+  if(sortMode==='most-active')sorted=[...sorted].sort((a,b)=>b.activeToday-a.activeToday);
+  else if(sortMode==='least-active')sorted=[...sorted].sort((a,b)=>a.activeToday-b.activeToday);
+  else if(sortMode==='largest')sorted=[...sorted].sort((a,b)=>b.totalMembers-a.totalMembers);
+  else if(sortMode==='smallest')sorted=[...sorted].sort((a,b)=>a.totalMembers-b.totalMembers);
+  if(!sorted.length){grid.innerHTML='<div class="no-groups"><div class="no-groups-icon">🔍</div><p>No groups match your search</p></div>';return}
+  grid.innerHTML=sorted.map(g=>{
+    const[c1,c2]=avatarGrad(g.id);
     const pct=g.totalMembers?Math.round(g.activeToday/g.totalMembers*100):0;
     const letter=g.name.trim()[0].toUpperCase();
-    return`<div class="group-card" onclick="openGroup('${encodeURIComponent(g.id)}','${esc(g.name)}')">
-      <div class="card-top">
-        <div class="group-avatar" style="background:linear-gradient(135deg,${c1},${c2})">${letter}</div>
-        <div class="group-name">${esc(g.name)}<small>${g.totalMembers} members</small></div>
+    const isPinned=getPins().includes(g.id);
+    const level=pct>=50?'activity-high':pct>=20?'activity-mid':'activity-low';
+    return`<div class="group-card ${level}" onclick="openGroup('${encodeURIComponent(g.id)}','${esc(g.name)}')">
+      ${isPinned?'<div class="pin-badge">📌 Pinned</div>':''}
+      <button class="pin-btn ${isPinned?'pinned':''}" onclick="togglePin('${g.id}',event)" title="${isPinned?'Unpin':'Pin'}">${isPinned?'📌':'📍'}</button>
+      <div class="gc-top">
+        <div class="gc-avatar" style="background:linear-gradient(135deg,${c1},${c2})">${letter}</div>
+        <div class="gc-info">
+          <div class="gc-name">${esc(g.name)}</div>
+          <div class="gc-meta">${g.totalMembers} members</div>
+        </div>
+        <span class="gc-badge ${level}">${pct}%</span>
       </div>
-      <div class="progress-wrap">
-        <div class="progress-label"><span style="color:#4a5568">Active today</span><span>${g.activeToday} / ${g.totalMembers}</span></div>
-        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="gc-bar-wrap">
+        <div class="gc-bar-label"><span>Activity today</span><b>${g.activeToday} / ${g.totalMembers}</b></div>
+        <div class="gc-bar"><div class="gc-fill ${level}" style="width:${pct}%"></div></div>
       </div>
-      <div class="card-stats">
-        <div class="c-stat tot"><div class="v">${g.totalMembers}</div><div class="l">Total</div></div>
-        <div class="c-stat act"><div class="v">${g.activeToday}</div><div class="l">Active</div></div>
-        <div class="c-stat ina"><div class="v">${g.inactiveToday}</div><div class="l">Inactive</div></div>
+      <div class="gc-bottom">
+        <div class="gc-stat tot"><div class="gv">${g.totalMembers}</div><div class="gl">Total</div></div>
+        <div class="gc-stat act"><div class="gv">${g.activeToday}</div><div class="gl">Active</div></div>
+        <div class="gc-stat ina"><div class="gv">${g.inactiveToday}</div><div class="gl">Inactive</div></div>
       </div>
     </div>`}).join('');
 }
@@ -405,7 +966,7 @@ async function openGroup(encodedId,name){
   const data=await res.json();
   if(data.error){showToast(data.error);return}
   currentGroup=data;allMembers=data.members;weekStats=data.weekStats;memberFilter='all';
-  const [c1,c2]=avatarGrad(data.id||encodedId);
+  const[c1,c2]=avatarGrad(data.id||encodedId);
   const av=document.getElementById('detail-avatar');
   av.textContent=dname[0].toUpperCase();
   av.style.background=`linear-gradient(135deg,${c1},${c2})`;
@@ -415,6 +976,7 @@ async function openGroup(encodedId,name){
   document.getElementById('d-active').textContent=active;
   document.getElementById('d-inactive').textContent=data.totalMembers-active;
   document.getElementById('day-panel').classList.remove('show');
+  loadMessageTypes(data.id);
   document.getElementById('member-search').value='';
   document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.fbtn')[0].classList.add('active');
@@ -426,14 +988,17 @@ function renderChart(){
   const ctx=document.getElementById('weekChart').getContext('2d');
   const vals=weekStats.map(d=>d.active);
   const total=currentGroup.totalMembers;
+  const isDark=document.documentElement.classList.contains('dark');
+  const gridColor=isDark?'rgba(48,54,61,.7)':'rgba(226,232,240,.8)';
+  const tickColor=isDark?'#8b949e':'#94a3b8';
   weekChart=new Chart(ctx,{
     type:'bar',
     data:{
       labels:weekStats.map(d=>d.day),
       datasets:[{
         label:'Active',data:vals,
-        backgroundColor:vals.map(v=>v>0?'rgba(37,211,102,0.8)':'rgba(26,35,50,0.8)'),
-        borderColor:vals.map(v=>v>0?'#25d366':'#1a2332'),
+        backgroundColor:vals.map(v=>v>0?'rgba(34,197,94,0.8)':'rgba(148,163,184,0.3)'),
+        borderColor:vals.map(v=>v>0?'#22c55e':'rgba(148,163,184,0.5)'),
         borderWidth:1,borderRadius:8,borderSkipped:false
       }]
     },
@@ -443,14 +1008,14 @@ function renderChart(){
       plugins:{
         legend:{display:false},
         tooltip:{
-          backgroundColor:'#0f1520',borderColor:'#1a2332',borderWidth:1,
-          titleColor:'#e2e8f0',bodyColor:'#25d366',padding:12,cornerRadius:10,
+          backgroundColor:isDark?'#1c2128':'#0f172a',borderColor:isDark?'#30363d':'#1e293b',borderWidth:1,
+          titleColor:'#e6edf3',bodyColor:'#22c55e',padding:12,cornerRadius:10,
           callbacks:{label:ctx=>` ${ctx.raw} / ${total} active`}
         }
       },
       scales:{
-        x:{ticks:{color:'#a0aec0',font:{size:12,family:'Inter'}},grid:{color:'#edf2f7'},border:{color:'transparent'}},
-        y:{ticks:{color:'#a0aec0',stepSize:1,font:{size:11}},grid:{color:'#edf2f7'},border:{color:'transparent'},max:Math.max(total,1),min:0}
+        x:{ticks:{color:tickColor,font:{size:12,family:'Inter'}},grid:{color:gridColor},border:{color:'transparent'}},
+        y:{ticks:{color:tickColor,font:{size:11},callback:v=>Number.isInteger(v)?v:''},grid:{color:gridColor},border:{color:'transparent'},min:0,suggestedMax:Math.max(...vals,5)}
       }
     }
   });
@@ -458,8 +1023,8 @@ function renderChart(){
 
 function showDayPanel(idx){
   const day=weekStats[idx];
-  document.getElementById('day-panel-title').textContent=`${day.day} ${day.label||''} · ${day.active} of ${day.total} active`;
-  weekChart.data.datasets[0].backgroundColor=weekStats.map((d,i)=>i===idx?'rgba(37,211,102,1)':(d.active>0?'rgba(37,211,102,0.3)':'rgba(26,35,50,0.8)'));
+  document.getElementById('day-panel-title').textContent=`${day.day} · ${day.date} · ${day.active} of ${day.total} active`;
+  weekChart.data.datasets[0].backgroundColor=weekStats.map((d,i)=>i===idx?'rgba(34,197,94,1)':(d.active>0?'rgba(34,197,94,0.3)':'rgba(148,163,184,0.3)'));
   weekChart.update();
   const list=document.getElementById('day-panel-members');
   if(!day.activeMembers.length){list.innerHTML='<div class="no-activity">No activity recorded this day</div>'}
@@ -469,9 +1034,9 @@ function showDayPanel(idx){
       return`<div class="day-member">
         <div class="day-av" style="background:linear-gradient(135deg,${c1},${c2})">${m.name?m.name[0].toUpperCase():m.number.slice(-2)}</div>
         <div class="day-info">
-          <div class="day-name">${m.name?esc(m.name):'<span style="color:#374151">Unknown</span>'}</div>
+          <div class="day-name">${m.name?esc(m.name):'<span style="opacity:.5">Unknown</span>'}</div>
           <div class="day-num">+${m.number}</div>
-          <div class="day-msg">${m.lastMessage?esc(m.lastMessage):'—'}</div>
+          <div class="day-msg">${m.lastMessage?renderBody(m.lastMessage):'—'}</div>
         </div>
         <div class="day-time">${fmtTime(m.timestamp)}</div>
       </div>`}).join('')
@@ -492,30 +1057,504 @@ function renderMembers(){
   if(!list.length){tbody.innerHTML='<tr class="empty-row"><td colspan="5">No members found</td></tr>';return}
   tbody.innerHTML=list.map((m,i)=>{
     const[c1,c2]=avatarGrad(m.number);
-    const badge=m.activeToday?`<span class="badge active"><span class="dot g"></span> Active</span>`:m.lastSeen?`<span class="badge inactive"><span class="dot r"></span> Inactive</span>`:`<span class="badge nodata"><span class="dot grey"></span> No data</span>`;
-    return`<tr>
-      <td style="color:#1e2d3d;font-size:12px;font-weight:600">${i+1}</td>
+    const daysSince=m.lastSeen?Math.floor((Date.now()-new Date(m.lastSeen))/(86400000)):null;
+    const warnDays=daysSince!==null&&daysSince>=7&&!m.activeToday;
+    const badge=m.activeToday
+      ?`<span class="badge active"><span class="dot g"></span> Active</span>`
+      :warnDays
+        ?`<span class="badge warn">⚠️ ${daysSince}d inactive</span>`
+        :m.lastSeen
+          ?`<span class="badge inactive"><span class="dot r"></span> Inactive</span>`
+          :`<span class="badge nodata"><span class="dot grey"></span> No data</span>`;
+    const nm=m.name?esc(m.name):m.number;
+    return`<tr class="clickable-row" onclick="showMember('${encodeURIComponent(currentGroup.id)}','${m.number}','${nm}')">
+      <td class="row-num">${i+1}</td>
       <td><div class="m-info">
         <div class="m-avatar" style="background:linear-gradient(135deg,${c1},${c2})">${avatarLetter(m)}</div>
-        <div><div class="m-name">${m.name?esc(m.name):'<span style="color:#2a3a4a">Unknown</span>'}</div><div class="m-number">+${m.number}</div></div>
+        <div>
+          <div class="m-name">${m.name?esc(m.name):'<span style="opacity:.5">Unknown</span>'}</div>
+          <div class="m-number">+${m.number}</div>
+        </div>
       </div></td>
       <td>${badge}</td>
-      <td><div class="last-msg">${m.lastMessage?esc(m.lastMessage):'<span style="color:#1e2d3d">—</span>'}</div></td>
+      <td><div class="last-msg">${m.lastMessage?esc(m.lastMessage):'—'}</div></td>
       <td><span class="t-time">${fmtTime(m.lastSeen)}</span></td>
     </tr>`;
   }).join('');
 }
 
-async function logout() {
-  if (!confirm('Logout from WhatsApp? You will need to scan the QR code again.')) return;
+async function logout(){
+  if(!confirm('Logout from WhatsApp? You will need to scan the QR code again.'))return;
   showPage('page-loading');
-  await fetch((window.BACKEND_URL||'')+'/api/logout', { method: 'POST' });
+  await fetch((window.BACKEND_URL||'')+'/api/logout',{method:'POST'});
   document.getElementById('qr-waiting').style.display='flex';
   document.getElementById('qr-img').style.display='none';
   document.getElementById('qr-img').src='';
 }
 
+let _allMsgs=[],_memberGroupId='',_memberNumber='';
+async function showMember(encodedGroupId,number,name){
+  _memberGroupId=encodedGroupId;_memberNumber=number;
+  const[c1,c2]=avatarGrad(number);
+  document.getElementById('member-page-name').textContent=name;
+  document.getElementById('member-page-number').textContent='+'+number;
+  const av=document.getElementById('member-avatar');
+  av.style.background=`linear-gradient(135deg,${c1},${c2})`;
+  av.textContent=name.trim()[0].toUpperCase();
+  document.getElementById('msg-search').value='';
+  showPage('page-member');
+  document.getElementById('mstat-msgs').textContent='—';
+  document.getElementById('mstat-days').textContent='—';
+  document.getElementById('mstat-24h').textContent='—';
+  document.getElementById('member-week-dots').innerHTML='';
+  try{
+    const sr=await fetch(`/api/member-stats/${encodedGroupId}/${number}`);
+    const sd=await sr.json();
+    document.getElementById('mstat-msgs').textContent=sd.totalMessages;
+    document.getElementById('mstat-days').textContent=sd.activeDays+'/7';
+    document.getElementById('member-week-dots').innerHTML=sd.stats.map(s=>{
+      const d=new Date(s.date);const day=d.toLocaleDateString('en-US',{weekday:'short'});
+      return`<div class="wdot ${s.active?'on':'off'}"><span>${day}</span><span>${s.count||''}</span></div>`;
+    }).join('');
+  }catch{}
+  const list=document.getElementById('member-msgs-list');
+  list.innerHTML='<div class="no-msgs">Loading messages…</div>';
+  try{
+    const r=await fetch(`/api/member-messages/${encodedGroupId}/${number}`);
+    const{messages}=await r.json();
+    _allMsgs=messages;
+    document.getElementById('mstat-24h').textContent=messages.length;
+    renderMsgs(messages);
+  }catch{list.innerHTML='<div class="no-msgs">Failed to load messages</div>';}
+}
+
+function renderMsgs(messages){
+  const list=document.getElementById('member-msgs-list');
+  if(!messages.length){list.innerHTML='<div class="no-msgs">No messages found</div>';return}
+  let html='';let lastDay='';
+  messages.forEach(m=>{
+    const d=new Date(m.timestamp);
+    const dayKey=d.toLocaleDateString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric'});
+    if(dayKey!==lastDay){html+=`<div class="date-divider"><span>${dayKey}</span></div>`;lastDay=dayKey;}
+    const cls=m.fromMe?'from-me':'from-other';
+    const time=d.toLocaleString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit'});
+    let content='';
+    if(m.mediaData){
+      if(m.mimetype&&m.mimetype.startsWith('image/')){
+        content=`<img class="msg-img" src="data:${m.mimetype};base64,${m.mediaData}" onclick="this.style.maxWidth=this.style.maxWidth?'':'100%'"/>`;
+      }else if(m.mimetype&&m.mimetype.startsWith('audio/')){
+        content=`<audio controls src="data:${m.mimetype};base64,${m.mediaData}" style="margin-top:6px;max-width:220px"></audio>`;
+      }else{
+        content=`<a class="doc-download" href="data:${m.mimetype};base64,${m.mediaData}" download="${m.filename||'file'}">📎 ${esc(m.filename||'Download file')}</a>`;
+      }
+    }
+    if(m.body)content=`<div>${renderBody(m.body)}</div>`+content;
+    if(!content)content=`<div style="opacity:.6;font-style:italic">[${m.type||'media'}]</div>`;
+    html+=`<div class="msg-bubble ${cls}"><div class="msg-box">${content}</div><div class="msg-time">${time}</div></div>`;
+  });
+  list.innerHTML=html;
+}
+
+function filterMsgs(){
+  const q=document.getElementById('msg-search').value.toLowerCase();
+  if(!q){renderMsgs(_allMsgs);return}
+  renderMsgs(_allMsgs.filter(m=>m.body&&m.body.toLowerCase().includes(q)));
+}
+
+// ── Dark mode ──
+function initDarkMode(){if(localStorage.getItem('dark')==='1'){document.documentElement.classList.add('dark');document.querySelectorAll('#dark-btn').forEach(b=>b.textContent='☀️')}}
+function toggleDark(){const on=document.documentElement.classList.toggle('dark');localStorage.setItem('dark',on?'1':'0');document.querySelectorAll('#dark-btn').forEach(b=>b.textContent=on?'☀️':'🌙')}
+initDarkMode();
+
+// ── Pin groups ──
+function getPins(){try{return JSON.parse(localStorage.getItem('pins')||'[]')}catch{return[]}}
+function togglePin(id,e){e.stopPropagation();const pins=getPins();const i=pins.indexOf(id);if(i>=0)pins.splice(i,1);else pins.push(id);localStorage.setItem('pins',JSON.stringify(pins));renderGroupCards(allGroups.filter(g=>document.getElementById('group-search').value?g.name.toLowerCase().includes(document.getElementById('group-search').value.toLowerCase()):true))}
+
+// ── Export CSV ──
+function exportCSV(){
+  if(!currentGroup)return;
+  const rows=[['#','Name','Number','Status','Last Message','Last Seen','Active Today']];
+  allMembers.forEach((m,i)=>{
+    const status=m.activeToday?'Active':m.lastSeen?'Inactive':'No data';
+    rows.push([i+1,m.name||'','+'+m.number,status,(m.lastMessage||'').replace(/"/g,'""'),m.lastSeen?new Date(m.lastSeen).toLocaleString('en-IN'):'',(m.activeToday?'Yes':'No')]);
+  });
+  const csv=rows.map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
+  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download=`${currentGroup.name}_members.csv`;a.click();
+}
+
+// ── Comparison ──
+async function showComparison(){
+  document.getElementById('modal-compare').classList.add('show');
+  const res=await fetch('/api/groups');const{groups}=await res.json();
+  const sorted=[...groups].sort((a,b)=>b.activeToday-a.activeToday);
+  const max=Math.max(...sorted.map(g=>g.totalMembers),1);
+  document.getElementById('cmp-tbody').innerHTML=sorted.map(g=>{
+    const pct=g.totalMembers?Math.round(g.activeToday/g.totalMembers*100):0;
+    const[c1,c2]=avatarGrad(g.id);
+    return`<tr class="cmp-row"><td><span style="display:inline-flex;align-items:center;gap:8px"><span style="width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,${c1},${c2});display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700">${g.name[0].toUpperCase()}</span>${esc(g.name)}</span></td><td>${g.totalMembers}</td><td style="color:var(--primary-dark);font-weight:700">${g.activeToday}</td><td><span>${pct}%</span><span class="cmp-bar"><span class="cmp-fill" style="width:${pct}%"></span></span></td></tr>`;
+  }).join('');
+}
+
+// ── Summaries ──
+async function showSummaries(){
+  document.getElementById('modal-summaries').classList.add('show');
+  const res=await fetch('/api/summaries');const{summaries}=await res.json();
+  if(!summaries.length){document.getElementById('summaries-list').innerHTML='<div class="no-msgs">No summaries yet — they are generated at midnight daily.</div>';return}
+  document.getElementById('summaries-list').innerHTML=summaries.map(s=>{
+    const active=s.groups.filter(g=>g.activeMembers>0);
+    return`<div class="sum-row"><div class="sum-date">📅 ${s.date}</div><div class="sum-groups">${active.slice(0,8).map(g=>`<span class="sum-chip">${esc(g.name)} · ${g.activeMembers}/${g.totalMembers} · ${g.totalMessages} msgs</span>`).join('')}${active.length>8?`<span class="sum-chip">+${active.length-8} more</span>`:''}</div></div>`;
+  }).join('');
+}
+
 connectSSE();
+
+// Fallback polling — in case SSE misses the initial event
+let pollTimer=setInterval(async()=>{
+  try{
+    const r=await fetch('/api/status');
+    const d=await r.json();
+    if(d.status==='ready'){clearInterval(pollTimer);showGroups();}
+    else if(d.status==='qr'&&d.qr){
+      clearInterval(pollTimer);
+      showPage('page-qr');
+      document.getElementById('qr-waiting').style.display='none';
+      const img=document.getElementById('qr-img');
+      img.src=d.qr;img.style.display='block';
+    }
+  }catch{}
+},2000);
+
+// ── Sort select listener ──
+document.addEventListener('DOMContentLoaded',()=>{
+  const sel=document.getElementById('sort-select');
+  if(sel)sel.addEventListener('change',e=>{
+    sortMode=e.target.value;
+    renderGroupCards(allGroups.filter(g=>{
+      const q=document.getElementById('group-search').value.toLowerCase();
+      return !q||g.name.toLowerCase().includes(q);
+    }));
+  });
+});
+
+// ── Auto-refresh ──────────────────────────────────────────────────────────
+let _lastRefresh=Date.now();
+function _updateRefreshChip(){
+  const s=Math.floor((Date.now()-_lastRefresh)/1000);
+  const chip=document.getElementById('refresh-chip');
+  if(chip)chip.textContent=s<5?'↻ just now':s<60?`↻ ${s}s ago`:`↻ ${Math.floor(s/60)}m ago`;
+}
+setInterval(_updateRefreshChip,5000);
+setInterval(async()=>{
+  const pg=document.querySelector('.page.active');
+  if(!pg)return;
+  if(pg.id==='page-groups'){try{await loadGroups(true);}catch{}}
+  else if(pg.id==='page-group'&&currentGroup){try{const e=encodeURIComponent(currentGroup.id);const r=await fetch((window.BACKEND_URL||'')+'/api/group/'+e);const d=await r.json();if(!d.error){currentGroup=d;allMembers=d.members;weekStats=d.weekStats;const active=d.members.filter(m=>m.activeToday).length;document.getElementById('d-active').textContent=active;document.getElementById('d-inactive').textContent=d.totalMembers-active;renderMembers();renderChart();}}catch{}}
+  _lastRefresh=Date.now();_updateRefreshChip();
+},30000);
+
+// ── Message type breakdown ────────────────────────────────────────────────
+async function loadMessageTypes(groupId){
+  try{
+    const r=await fetch((window.BACKEND_URL||'')+'/api/message-types/'+encodeURIComponent(groupId));
+    const{types}=await r.json();
+    const total=Object.values(types).reduce((s,v)=>s+v,0);
+    if(!total){document.getElementById('type-card').style.display='none';return;}
+    const icons={text:'💬',image:'🖼️',audio:'🎵',document:'📎',video:'🎬',other:'📦'};
+    document.getElementById('type-strip').innerHTML=Object.entries(types).filter(([,v])=>v>0).map(([k,v])=>`<div class="type-pill"><span>${icons[k]||'📦'}</span>${k.charAt(0).toUpperCase()+k.slice(1)}: <b>${v}</b></div>`).join('');
+    document.getElementById('type-card').style.display='block';
+  }catch{}
+}
+
+// ── Global search ─────────────────────────────────────────────────────────
+function openSearch(){document.getElementById('search-overlay').classList.add('show');setTimeout(()=>document.getElementById('global-search-input').focus(),50);}
+function closeSearch(){document.getElementById('search-overlay').classList.remove('show');}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeSearch();closeEmailSettings();}});
+let _searchTimer=null;
+function globalSearch(q){
+  clearTimeout(_searchTimer);
+  const res=document.getElementById('search-results');
+  if(q.length<2){res.innerHTML='<div style="text-align:center;color:var(--text-3);padding:32px;font-size:13px">Type at least 2 characters to search</div>';return;}
+  res.innerHTML='<div style="text-align:center;color:var(--text-3);padding:24px;font-size:13px">Searching…</div>';
+  _searchTimer=setTimeout(async()=>{
+    try{
+      const r=await fetch((window.BACKEND_URL||'')+'/api/search?q='+encodeURIComponent(q));
+      const{results}=await r.json();
+      if(!results.length){res.innerHTML='<div style="text-align:center;color:var(--text-3);padding:32px;font-size:13px">No results found</div>';return;}
+      const re=new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+      res.innerHTML=results.map(r=>`<div class="search-result" onclick="closeSearch();loadGroupDetail('${esc(r.groupId)}','${esc(r.groupName)}')">
+        <span class="sr-time">${fmtTime(r.timestamp)}</span>
+        <div class="sr-group">${esc(r.groupName)}</div>
+        <div class="sr-sender">${r.name?esc(r.name):'+'+r.number}</div>
+        <div class="sr-body">${esc(r.body).replace(re,'<mark class="sr-highlight">$1</mark>')}</div>
+      </div>`).join('');
+    }catch{res.innerHTML='<div style="text-align:center;color:var(--text-3);padding:32px">Search failed</div>';}
+  },350);
+}
+
+// ── Email settings ────────────────────────────────────────────────────────
+async function openEmailSettings(){
+  try{
+    const r=await fetch((window.BACKEND_URL||'')+'/api/config/email');
+    const{email:e}=await r.json();
+    document.getElementById('em-host').value=e.host||'';
+    document.getElementById('em-port').value=e.port||587;
+    document.getElementById('em-user').value=e.user||'';
+    document.getElementById('em-pass').value='';
+    document.getElementById('em-pass-saved').textContent=e.pass?'(password saved ✓)':'';
+    document.getElementById('em-to').value=e.to||'';
+    document.getElementById('em-from').value=e.from||'';
+  }catch{}
+  document.getElementById('email-modal').classList.add('show');
+}
+function closeEmailSettings(){document.getElementById('email-modal').classList.remove('show');}
+async function sendTestEmail(){
+  const btn=document.getElementById('test-email-btn');
+  btn.disabled=true;btn.textContent='Sending…';
+  try{
+    const r=await fetch((window.BACKEND_URL||'')+'/api/test-email',{method:'POST'});
+    const d=await r.json();
+    if(d.ok){showToast('✅ Test email sent! Check your inbox.');}
+    else showToast('❌ '+d.error);
+  }catch{showToast('❌ Failed to send test email');}
+  btn.disabled=false;btn.textContent='📧 Test Email';
+}
+async function saveEmailSettings(){
+  const body={host:document.getElementById('em-host').value,port:Number(document.getElementById('em-port').value)||587,user:document.getElementById('em-user').value,pass:document.getElementById('em-pass').value,to:document.getElementById('em-to').value,from:document.getElementById('em-from').value};
+  try{
+    const r=await fetch((window.BACKEND_URL||'')+'/api/config/email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(d.ok){showToast('✅ Email settings saved!');closeEmailSettings();}
+    else showToast('Failed to save settings');
+  }catch{showToast('Failed to save settings');}
+}
+
+// ── Contacts page ────────────────────────────────────────────────────────
+let _allContactsData = { active: [], inactive: [] };
+let _contactsQ = '';
+let _contactsFilter = 'all';
+
+async function showContacts() {
+  showPage('page-contacts');
+  await loadContacts();
+}
+
+async function loadContacts() {
+  document.getElementById('contacts-sub').textContent = 'Loading...';
+  try {
+    const r = await fetch((window.BACKEND_URL||'')+'/api/contacts');
+    const data = await r.json();
+    _allContactsData = data;
+    const total = data.active.length + data.inactive.length;
+    document.getElementById('contacts-sub').textContent = `${total} contacts — ${data.active.length} active, ${data.inactive.length} inactive`;
+    renderContacts();
+  } catch(e) { document.getElementById('contacts-sub').textContent = 'Failed to load'; }
+}
+
+function setContactFilter(f, btn) {
+  _contactsFilter = f;
+  document.querySelectorAll('#cf-all,#cf-active,#cf-inactive').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderContacts();
+}
+
+function filterContacts() {
+  _contactsQ = document.getElementById('contacts-search').value.toLowerCase();
+  renderContacts();
+}
+
+function _sortContacts(arr) {
+  const mode = document.getElementById('contacts-sort')?.value || 'recent';
+  const copy = [...arr];
+  if      (mode === 'recent')   copy.sort((a,b) => (b.lastSeen||0) - (a.lastSeen||0));
+  else if (mode === 'messages') copy.sort((a,b) => b.msgCount - a.msgCount);
+  else if (mode === 'groups')   copy.sort((a,b) => b.groups.length - a.groups.length);
+  else if (mode === 'name-az')  copy.sort((a,b) => (a.name||a.phone).localeCompare(b.name||b.phone));
+  else if (mode === 'name-za')  copy.sort((a,b) => (b.name||b.phone).localeCompare(a.name||a.phone));
+  return copy;
+}
+
+function renderContacts() {
+  const q = _contactsQ;
+  const searchFn = c => !q || (c.name && c.name.toLowerCase().includes(q)) || c.phone.includes(q);
+
+  // Combine active + inactive based on filter
+  let activeList   = _allContactsData.active.filter(searchFn);
+  let inactiveList = _allContactsData.inactive.filter(searchFn);
+
+  // Show/hide sections based on filter
+  const showActive   = _contactsFilter !== 'inactive';
+  const showInactive = _contactsFilter !== 'active';
+
+  document.getElementById('active-contacts-section').style.display   = showActive   ? '' : 'none';
+  document.getElementById('inactive-contacts-section').style.display = showInactive ? '' : 'none';
+
+  if (showActive) {
+    const sorted = _sortContacts(activeList);
+    document.getElementById('active-count').textContent = sorted.length;
+    document.getElementById('active-contacts-list').innerHTML = sorted.length
+      ? sorted.map(c => _contactCard(c, true)).join('')
+      : '<div class="contacts-empty">No active contacts match</div>';
+  }
+  if (showInactive) {
+    const sorted = _sortContacts(inactiveList);
+    document.getElementById('inactive-count').textContent = sorted.length;
+    document.getElementById('inactive-contacts-list').innerHTML = sorted.length
+      ? sorted.map(c => _contactCard(c, false)).join('')
+      : '<div class="contacts-empty">No inactive contacts match</div>';
+  }
+}
+
+function _contactCard(c, isActive) {
+  const [c1, c2] = avatarGrad(c.phone);
+  const letter = c.name ? c.name.trim()[0].toUpperCase() : c.phone.slice(-2);
+  const displayName = c.name ? esc(c.name) : `<span style="opacity:.5">Unknown</span>`;
+  const lastSeen = c.lastSeen ? fmtTime(new Date(c.lastSeen).toISOString()) : 'Never seen';
+  const groupTxt = `${c.groups.length} group${c.groups.length!==1?'s':''}`;
+  const msgTxt   = c.msgCount > 0 ? ` · ${c.msgCount} msg${c.msgCount!==1?'s':''}` : '';
+  return `<div class="contact-card${isActive?'':' inactive-card'}" onclick="openContact('${c.phone}')">
+    <div class="cc-avatar" style="background:linear-gradient(135deg,${c1},${c2})">${letter}</div>
+    <div class="cc-info">
+      <div class="cc-name">${displayName}</div>
+      <div class="cc-phone">+${c.phone}</div>
+    </div>
+    <div class="cc-right">
+      <div class="cc-lastmsg">${lastSeen}</div>
+      <div class="cc-stat">📍 ${groupTxt}${msgTxt}</div>
+      <span class="${isActive?'cc-badge-act':'cc-badge-ina'}">${isActive?'🟢 Active':'⚫ Inactive'}</span>
+    </div>
+  </div>`;
+}
+
+// ── Contact Detail ────────────────────────────────────────────────────────
+let _contactMsgsByDay = {};
+
+async function openContact(phone) {
+  showPage('page-contact-detail');
+  // Set loading state
+  document.getElementById('cd-nav-name').textContent   = 'Loading…';
+  document.getElementById('cd-nav-phone').textContent  = '+'+phone;
+  document.getElementById('cd-name').textContent       = '…';
+  document.getElementById('cd-phone-text').textContent = '+'+phone;
+  document.getElementById('cd-status-badge').innerHTML = '';
+  document.getElementById('cd-groups-row').innerHTML   = '<span style="color:var(--text-3);font-size:13px">Loading…</span>';
+  document.getElementById('cd-day-strip').innerHTML    = '';
+  document.getElementById('cd-msgs-panel').classList.remove('show');
+
+  try {
+    const r = await fetch((window.BACKEND_URL||'')+'/api/contact/'+phone);
+    const data = await r.json();
+    _contactMsgsByDay = data.msgsByDay || {};
+
+    const [c1, c2] = avatarGrad(phone);
+    const letter = (data.name && data.name !== phone) ? data.name.trim()[0].toUpperCase() : phone.slice(-2);
+
+    // Navbar
+    document.getElementById('cd-nav-name').textContent  = data.name || phone;
+    document.getElementById('cd-nav-phone').textContent = '+'+phone;
+    const navAv = document.getElementById('cd-nav-avatar');
+    navAv.style.background = `linear-gradient(135deg,${c1},${c2})`;
+    navAv.textContent = letter;
+
+    // Hero
+    const bigAv = document.getElementById('cd-big-avatar');
+    bigAv.style.background = `linear-gradient(135deg,${c1},${c2})`;
+    bigAv.textContent = letter;
+    document.getElementById('cd-name').textContent       = data.name || phone;
+    document.getElementById('cd-phone-text').textContent = '+'+phone;
+
+    const isActive = data.last7Days.some(d => d.active);
+    document.getElementById('cd-status-badge').innerHTML = isActive
+      ? '<span class="badge active"><span class="dot g"></span> Active this week</span>'
+      : '<span class="badge inactive"><span class="dot r"></span> Inactive this week</span>';
+
+    // Groups
+    document.getElementById('cd-groups-row').innerHTML = data.groups.length
+      ? data.groups.map(g =>
+          `<div class="cd-group-chip${g.hasMessages?' has-msgs':''}" onclick="event.stopPropagation();closeSearch&&closeSearch();openGroup('${encodeURIComponent(g.id)}','${esc(g.name)}')" title="${g.hasMessages?'Has messages':'Member only'}">
+            ${g.hasMessages?'💬':'👥'} ${esc(g.name)}
+          </div>`).join('')
+      : '<span style="color:var(--text-3);font-size:13px">Not in any tracked groups</span>';
+
+    // 7-day strip
+    document.getElementById('cd-day-strip').innerHTML = data.last7Days.map(d =>
+      `<button class="cd-day-btn${d.active?' has-msgs':' no-msgs'}" onclick="${d.active?`showContactDay('${d.date}',this)`:'return'}" title="${d.date}">
+        <div class="cd-day-name">${d.day}</div>
+        <div class="cd-day-lbl">${d.label}</div>
+        <div class="cd-day-count">${d.active ? d.msgCount : '–'}</div>
+      </button>`).join('');
+
+  } catch(e) { showToast('Failed to load contact: '+e.message); }
+}
+
+function showContactDay(date, btn) {
+  document.querySelectorAll('.cd-day-btn').forEach(b => b.classList.remove('sel'));
+  if (btn) btn.classList.add('sel');
+
+  const msgs = _contactMsgsByDay[date] || [];
+  const panel = document.getElementById('cd-msgs-panel');
+
+  const d = new Date(date+'T00:00:00');
+  const dateLabel = d.toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long', year:'numeric', timeZone:'Asia/Kolkata' });
+  document.getElementById('cd-msgs-panel-title').textContent = `📨 ${dateLabel} · ${msgs.length} message${msgs.length!==1?'s':''}`;
+
+  if (!msgs.length) {
+    document.getElementById('cd-msgs-list').innerHTML = '<div class="no-cd-msgs">No messages on this day</div>';
+  } else {
+    // Group by WhatsApp group
+    const byGroup = {};
+    msgs.forEach(m => {
+      if (!byGroup[m.groupId]) byGroup[m.groupId] = { name: m.groupName, msgs: [] };
+      byGroup[m.groupId].msgs.push(m);
+    });
+    let html = '';
+    for (const [, gData] of Object.entries(byGroup)) {
+      html += `<div class="cd-grp-hdr">💬 ${esc(gData.name)}</div>`;
+      html += gData.msgs.map(m => {
+        const time = new Date(m.timestamp).toLocaleTimeString('en-IN', { timeZone:'Asia/Kolkata', hour:'2-digit', minute:'2-digit' });
+        let extra = '';
+        if (m.mediaData) {
+          if (m.mimetype && m.mimetype.startsWith('image/')) {
+            extra = `<img class="msg-img" src="data:${m.mimetype};base64,${m.mediaData}" style="max-width:220px;border-radius:8px;margin-top:6px"/>`;
+          } else if (m.mimetype && m.mimetype.startsWith('audio/')) {
+            extra = `<audio controls src="data:${m.mimetype};base64,${m.mediaData}" style="max-width:220px;margin-top:6px"></audio>`;
+          } else {
+            extra = `<a class="doc-download" style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;background:var(--surface-2);border-radius:8px;font-size:12px;text-decoration:none;color:var(--text);border:1px solid var(--border)" href="data:${m.mimetype};base64,${m.mediaData}" download="${m.filename||'file'}">📎 ${esc(m.filename||'Download')}</a>`;
+          }
+        }
+        const bodyHtml  = m.body ? `<div class="cd-msg-body-text">${renderBody(m.body)}</div>` : '';
+        const mediaHtml = extra  ? `<div style="margin-top:4px">${extra}</div>` : '';
+        const noContent = !m.body && !extra ? `<div class="cd-msg-body-text" style="opacity:.5;font-style:italic">[${m.type||'media'}]</div>` : '';
+        return `<div class="cd-msg-item">${bodyHtml}${mediaHtml}${noContent}<div class="cd-msg-time-text">🕐 ${time}</div></div>`;
+      }).join('');
+    }
+    document.getElementById('cd-msgs-list').innerHTML = html;
+  }
+  panel.classList.add('show');
+}
+
+// ── PDF export ────────────────────────────────────────────────────────────
+async function exportPDF(range){
+  if(!currentGroup){showToast('No group loaded');return;}
+  try{
+    const r=await fetch((window.BACKEND_URL||'')+'/api/export/'+encodeURIComponent(currentGroup.id)+'?range='+range);
+    const d=await r.json();
+    const{jsPDF}=window.jspdf;
+    const doc=new jsPDF();
+    doc.setFontSize(18);doc.setTextColor(22,163,74);doc.text('WhatsApp Monitor',14,18);
+    doc.setFontSize(13);doc.setTextColor(15,23,42);doc.text(d.groupName,14,28);
+    doc.setFontSize(10);doc.setTextColor(100,116,139);
+    doc.text(`${range==='weekly'?'Weekly':'Daily'} Report  |  ${d.dateRange[0]}${d.dateRange.length>1?' – '+d.dateRange[d.dateRange.length-1]:''}`,14,36);
+    doc.text(`Total: ${d.totalMembers} members  |  Active: ${d.activeCount}  |  Messages: ${d.totalMessages}  |  Generated: ${new Date(d.generatedAt).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})}`,14,43);
+    doc.autoTable({
+      startY:50,
+      head:[['#','Member','Number','Messages','Last Active','Last Message']],
+      body:d.members.map((m,i)=>[i+1,m.name||'—','+'+m.number,m.totalMsgs,m.lastSeen?new Date(m.lastSeen).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'—',(m.lastMsg||'—').substring(0,40)]),
+      styles:{fontSize:8,cellPadding:3},headStyles:{fillColor:[22,163,74],textColor:255,fontStyle:'bold'},alternateRowStyles:{fillColor:[248,250,252]},columnStyles:{0:{cellWidth:8},2:{cellWidth:28},3:{cellWidth:18},4:{cellWidth:30}}
+    });
+    doc.save(`${d.groupName.replace(/[^a-z0-9]/gi,'_')}_${range}_${d.dateRange[0]}.pdf`);
+  }catch(e){showToast('PDF export failed: '+e.message);}
+}
 </script>
 </body>
 </html>
