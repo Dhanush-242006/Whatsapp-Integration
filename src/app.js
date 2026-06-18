@@ -56,6 +56,14 @@ function broadcast(event, data) {
   const msg = `data: ${JSON.stringify({ event, data })}\n\n`;
   sseClients.forEach(res => { try { res.write(msg); } catch {} });
 }
+function clearSession() {
+  // Delete all Chrome/WhatsApp session dirs under DATA_DIR
+  for (const name of ['session', '.wwebjs_auth']) {
+    const p = path.join(DATA_DIR, name);
+    try { fs.rmSync(p, { recursive: true, force: true }); console.log('🗑️  Cleared session dir:', p); } catch {}
+  }
+}
+
 function cleanOldMessages(msgs) {
   const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
   for (const gId of Object.keys(msgs)) {
@@ -107,7 +115,10 @@ client.on('ready', async () => {
 });
 client.on('auth_failure', () => {
   botStatus = 'auth_failure';
-  broadcast('error', { message: 'Authentication failed. Please restart.' });
+  console.log('🔑 Auth failed — clearing session and retrying...');
+  clearSession();
+  broadcast('status', { status: 'initializing' });
+  setTimeout(() => client.initialize(), 3000);
 });
 
 client.on('disconnected', () => {
@@ -429,6 +440,16 @@ app.post('/api/refresh-groups', async (req, res) => {
   } catch (err) {
     res.json({ ok: false, error: err.message });
   }
+});
+
+app.post('/api/reset-session', async (req, res) => {
+  console.log('🔄 Manual session reset requested');
+  clearSession();
+  botStatus = 'initializing';
+  cachedQR = null;
+  broadcast('status', { status: 'initializing' });
+  res.json({ ok: true });
+  setTimeout(() => client.initialize(), 1000);
 });
 
 app.post('/api/logout', async (req, res) => {

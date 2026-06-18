@@ -423,6 +423,7 @@ td{padding:12px 18px;font-size:13px;vertical-align:middle;color:var(--text)}
   <div class="spinner"></div>
   <div class="loading-title">WhatsApp Monitor</div>
   <div class="loading-text">Connecting...</div>
+  <button class="btn" style="margin-top:16px;font-size:12px;opacity:.7" onclick="resetSession()">Reset & Scan New QR</button>
 </div>
 
 <!-- ── QR ── -->
@@ -1086,6 +1087,14 @@ function renderMembers(){
       <td><span class="t-time">${fmtTime(m.lastSeen)}</span></td>
     </tr>`;
   }).join('');
+}
+
+async function resetSession(){
+  if(!confirm('This will clear the WhatsApp session and show a new QR code to scan. Continue?'))return;
+  await fetch((window.BACKEND_URL||'')+'/api/reset-session',{method:'POST'});
+  document.getElementById('qr-waiting').style.display='flex';
+  document.getElementById('qr-img').style.display='none';
+  document.getElementById('qr-img').src='';
 }
 
 async function logout(){
