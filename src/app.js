@@ -120,7 +120,7 @@ client.on('ready', async () => {
   console.log('✅ WhatsApp connected!');
   broadcast('ready', {});
 
-  setTimeout(async () => { await saveGroups(); }, 90000); // wait 90s for WA store to populate
+  setTimeout(async () => { await saveGroups(); }, 180000); // wait 3min for WA store to finish syncing
 });
 client.on('auth_failure', () => {
   console.log('🔑 Auth failed — clearing session and restarting...');
@@ -295,7 +295,7 @@ async function saveGroups(retries = 3) {
             return { ok: true, groups };
           } catch (e) { return { ok: false, error: e.message }; }
         }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('store read timeout after 30s')), 30000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('store read timeout after 8min')), 480000))
       ]);
       if (!result.ok) throw new Error(result.error);
       writeJSON(GROUPS_FILE, { groups: result.groups, updatedAt: new Date().toISOString() });
