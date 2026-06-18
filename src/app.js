@@ -114,11 +114,9 @@ client.on('ready', async () => {
   setTimeout(async () => { await saveGroups(); }, 5000);
 });
 client.on('auth_failure', () => {
-  botStatus = 'auth_failure';
-  console.log('🔑 Auth failed — clearing session and retrying...');
+  console.log('🔑 Auth failed — clearing session and restarting...');
   clearSession();
-  broadcast('status', { status: 'initializing' });
-  setTimeout(() => client.initialize(), 3000);
+  setTimeout(() => process.exit(0), 500);
 });
 
 client.on('disconnected', () => {
@@ -443,13 +441,10 @@ app.post('/api/refresh-groups', async (req, res) => {
 });
 
 app.post('/api/reset-session', async (req, res) => {
-  console.log('🔄 Manual session reset requested');
+  console.log('🔄 Manual session reset — clearing session and restarting...');
   clearSession();
-  botStatus = 'initializing';
-  cachedQR = null;
-  broadcast('status', { status: 'initializing' });
   res.json({ ok: true });
-  setTimeout(() => client.initialize(), 1000);
+  setTimeout(() => process.exit(0), 500); // Railway auto-restarts fresh
 });
 
 app.post('/api/logout', async (req, res) => {
