@@ -273,30 +273,37 @@ async function backfillMessages() {
   }
 }
 
-async function saveGroups(retries = 5) {
+async function saveGroups(retries = 3) {
   for (let i = 0; i < retries; i++) {
     try {
       console.log(`📋 Fetching groups (attempt ${i + 1}/${retries})...`);
-      const chats = await Promise.race([
-        client.getChats(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('getChats timeout after 45s')), 45000))
+      // Read directly from WhatsApp's in-memory store — much faster than getChats()
+      const result = await Promise.race([
+        client.pupPage.evaluate(() => {
+          try {
+            const groups = [];
+            window.Store.Chat.getModelsArray().forEach(chat => {
+              if (!chat.isGroup) return;
+              const participants = [];
+              try {
+                (chat.groupMetadata?.participants?.getModelsArray() || []).forEach(p => {
+                  participants.push({ number: p.id.user, name: null, isAdmin: !!(p.isAdmin || p.isSuperAdmin) });
+                });
+              } catch (_) {}
+              groups.push({ id: chat.id._serialized, name: chat.name || chat.formattedTitle || '', participants });
+            });
+            return { ok: true, groups };
+          } catch (e) { return { ok: false, error: e.message }; }
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('store read timeout after 30s')), 30000))
       ]);
-
-      const groups = chats.filter(c => c.isGroup).map(g => ({
-        id:           g.id._serialized,
-        name:         g.name,
-        participants: g.participants.map(p => ({
-          number:  p.id.user,
-          name:    null,
-          isAdmin: !!(p.isAdmin || p.isSuperAdmin)
-        }))
-      }));
-      writeJSON(GROUPS_FILE, { groups, updatedAt: new Date().toISOString() });
-      console.log(`📋 ${groups.length} groups saved`);
+      if (!result.ok) throw new Error(result.error);
+      writeJSON(GROUPS_FILE, { groups: result.groups, updatedAt: new Date().toISOString() });
+      console.log(`📋 ${result.groups.length} groups saved`);
       return;
     } catch (err) {
       console.error(`saveGroups attempt ${i + 1}:`, err.message);
-      if (i < retries - 1) await new Promise(r => setTimeout(r, 8000));
+      if (i < retries - 1) await new Promise(r => setTimeout(r, 15000));
     }
   }
 }
