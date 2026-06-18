@@ -120,7 +120,7 @@ client.on('ready', async () => {
   console.log('✅ WhatsApp connected!');
   broadcast('ready', {});
 
-  setTimeout(async () => { await saveGroups(); }, 5000);
+  setTimeout(async () => { await saveGroups(); }, 90000); // wait 90s for WA store to populate
 });
 client.on('auth_failure', () => {
   console.log('🔑 Auth failed — clearing session and restarting...');
@@ -277,30 +277,17 @@ async function saveGroups(retries = 5) {
   for (let i = 0; i < retries; i++) {
     try {
       console.log(`📋 Fetching groups (attempt ${i + 1}/${retries})...`);
-      const chats = await client.getChats();
-
-      // Fetch all contact names from WhatsApp's in-memory store
-      let contactNames = {};
-      try {
-        contactNames = await client.pupPage.evaluate(() => {
-          const map = {};
-          try {
-            (window.Store.Contact.getModelsArray() || []).forEach(c => {
-              if (c.id && c.id.user) {
-                map[c.id.user] = c.pushname || c.name || c.verifiedName || null;
-              }
-            });
-          } catch {}
-          return map;
-        });
-      } catch {}
+      const chats = await Promise.race([
+        client.getChats(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('getChats timeout after 45s')), 45000))
+      ]);
 
       const groups = chats.filter(c => c.isGroup).map(g => ({
         id:           g.id._serialized,
         name:         g.name,
         participants: g.participants.map(p => ({
           number:  p.id.user,
-          name:    contactNames[p.id.user] || null,
+          name:    null,
           isAdmin: !!(p.isAdmin || p.isSuperAdmin)
         }))
       }));
