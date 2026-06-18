@@ -880,7 +880,12 @@ function connectSSE(){
 async function refreshGroups(){
   const btn=document.getElementById('refresh-btn');
   btn.textContent='↻ Refreshing...';btn.disabled=true;
-  await fetch((window.BACKEND_URL||'')+'/api/refresh-groups',{method:'POST'});
+  try{
+    const r=await fetch((window.BACKEND_URL||'')+'/api/refresh-groups',{method:'POST'});
+    const d=await r.json();
+    if(!d.ok)showToast('❌ '+d.error);
+    else showToast('✅ '+d.groups+' groups loaded');
+  }catch(e){showToast('❌ '+e.message);}
   await loadGroups();
   btn.textContent='↻ Refresh';btn.disabled=false;
 }

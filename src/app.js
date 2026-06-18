@@ -91,9 +91,7 @@ client.on('ready', async () => {
   console.log('✅ WhatsApp connected!');
   broadcast('ready', {});
 
-  console.log('⏳ Waiting 60s before fetching groups...');
-  
-  setTimeout(async () => { await saveGroups(); }, 60000);
+  setTimeout(async () => { await saveGroups(); }, 5000);
 });
 client.on('auth_failure', () => {
   botStatus = 'auth_failure';
@@ -411,9 +409,14 @@ app.get('/api/summaries', (req, res) => {
 });
 
 app.post('/api/refresh-groups', async (req, res) => {
-  if (botStatus !== 'ready') return res.json({ ok: false, error: 'Not connected' });
-  await saveGroups();
-  res.json({ ok: true });
+  if (botStatus !== 'ready') return res.json({ ok: false, error: `Not connected (status: ${botStatus})` });
+  try {
+    await saveGroups();
+    const data = readJSON(GROUPS_FILE);
+    res.json({ ok: true, groups: data ? data.groups.length : 0 });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  }
 });
 
 app.post('/api/logout', async (req, res) => {
