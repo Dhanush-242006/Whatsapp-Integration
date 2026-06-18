@@ -20,9 +20,20 @@ const MESSAGES_FILE  = path.join(DATA_DIR, 'messages.json');
 const SUMMARIES_FILE = path.join(DATA_DIR, 'summaries.json');
 const CONFIG_FILE    = path.join(DATA_DIR, 'config.json');
 
-// Remove Chrome lockfile left by a previous unclean shutdown
-const lockFile = path.join(DATA_DIR, 'wwebjs_auth/session/SingletonLock');
-try { fs.unlinkSync(lockFile); console.log('🔓 Removed stale Chrome lockfile'); } catch {}
+// Remove all stale Chrome lock files left by a previous unclean shutdown
+function removeSingletonLocks(dir) {
+  if (!fs.existsSync(dir)) return;
+  try {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) removeSingletonLocks(full);
+      else if (['SingletonLock', 'SingletonSocket', 'SingletonCookie'].includes(entry.name)) {
+        try { fs.unlinkSync(full); console.log('🔓 Removed lock:', full); } catch {}
+      }
+    }
+  } catch {}
+}
+removeSingletonLocks(path.join(DATA_DIR, 'wwebjs_auth'));
 
 const sseClients = new Set();
 let botStatus = 'initializing';
