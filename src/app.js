@@ -90,17 +90,15 @@ const client = new Client({
       '--disable-extensions',
       '--no-first-run',
       '--no-zygote',
-      '--single-process',
-      '--disable-features=VizDisplayCompositor,IsolateOrigins,site-per-process',
-      '--js-flags=--max-old-space-size=256',
-      '--aggressive-cache-discard',
+      '--disable-features=VizDisplayCompositor,IsolateOrigins,site-per-process,AudioServiceOutOfProcess',
       '--disable-background-networking',
       '--disable-default-apps',
       '--disable-sync',
       '--disable-translate',
-      '--metrics-recording-only',
       '--mute-audio',
       '--safebrowsing-disable-auto-update',
+      '--disable-background-timer-throttling',
+      '--disable-renderer-backgrounding',
     ]
   }
 });
