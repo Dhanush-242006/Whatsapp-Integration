@@ -33,7 +33,8 @@ function removeSingletonLocks(dir) {
     }
   } catch {}
 }
-removeSingletonLocks(path.join(DATA_DIR, 'wwebjs_auth'));
+// Search both possible locations (with and without dot prefix)
+removeSingletonLocks(DATA_DIR);
 
 const sseClients = new Set();
 let botStatus = 'initializing';
