@@ -119,17 +119,50 @@ client.on('ready', async () => {
   cachedQR  = null;
   console.log('✅ WhatsApp connected!');
   broadcast('ready', {});
-
-  // WA decrypts messages in background — JS thread unblocks when sync finishes (can take 30+ min first time)
-  const autoFetch = async () => {
-    const ok = await saveGroups();
-    if (!ok) {
-      console.log('📋 WA still syncing, retrying in 10 min...');
-      setTimeout(autoFetch, 600000);
-    }
-  };
-  setTimeout(autoFetch, 300000); // first try after 5 min
+  injectGroupWatcher();
 });
+
+async function injectGroupWatcher() {
+  try {
+    // Expose a Node.js function that Chrome JS can call directly
+    await client.pupPage.exposeFunction('sendGroupsToNode', (groups) => {
+      if (!groups || !groups.length) return;
+      writeJSON(GROUPS_FILE, { groups, updatedAt: new Date().toISOString() });
+      console.log(`📋 ${groups.length} groups auto-loaded from WA store`);
+      broadcast('groups_ready', {});
+    });
+  } catch (_) {} // already exposed on reconnect
+
+  try {
+    // Inject a setInterval INSIDE Chrome — runs in WA's own event loop, no external timeout
+    await client.pupPage.evaluate(() => {
+      const extract = () => {
+        try {
+          const models = window.Store && window.Store.Chat && window.Store.Chat.models;
+          if (!models || !models.length) return false;
+          const groups = [];
+          for (let i = 0; i < models.length; i++) {
+            const c = models[i];
+            if (c && c.isGroup && c.id && c.id._serialized)
+              groups.push({ id: c.id._serialized, name: c.name || c.formattedTitle || '', participants: [] });
+          }
+          if (!groups.length) return false;
+          window.sendGroupsToNode(groups);
+          return true;
+        } catch (_) { return false; }
+      };
+      if (!extract()) {
+        const iv = setInterval(() => { if (extract()) clearInterval(iv); }, 3000);
+        setTimeout(() => clearInterval(iv), 7200000); // stop after 2h
+      }
+    });
+    console.log('👀 Group watcher injected into Chrome');
+  } catch (e) {
+    console.log('⚠️ Watcher injection failed, falling back to retry loop:', e.message);
+    const retry = async () => { if (!await saveGroups()) setTimeout(retry, 600000); };
+    setTimeout(retry, 300000);
+  }
+}
 client.on('auth_failure', () => {
   console.log('🔑 Auth failed — clearing session and restarting...');
   clearSession();
