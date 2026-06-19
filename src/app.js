@@ -290,20 +290,17 @@ async function saveGroups(retries = 3) {
         client.pupPage.evaluate(() => {
           try {
             const groups = [];
-            window.Store.Chat.getModelsArray().forEach(chat => {
-              if (!chat.isGroup) return;
-              const participants = [];
-              try {
-                (chat.groupMetadata?.participants?.getModelsArray() || []).forEach(p => {
-                  participants.push({ number: p.id.user, name: null, isAdmin: !!(p.isAdmin || p.isSuperAdmin) });
-                });
-              } catch (_) {}
-              groups.push({ id: chat.id._serialized, name: chat.name || chat.formattedTitle || '', participants });
-            });
+            const chats = window.Store.Chat.models || [];
+            for (let i = 0; i < chats.length; i++) {
+              const chat = chats[i];
+              if (chat && chat.isGroup && chat.id) {
+                groups.push({ id: chat.id._serialized, name: chat.name || chat.formattedTitle || '', participants: [] });
+              }
+            }
             return { ok: true, groups };
           } catch (e) { return { ok: false, error: e.message }; }
         }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('store read timeout after 8min')), 480000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('store read timeout after 2min')), 120000))
       ]);
       if (!result.ok) throw new Error(result.error);
       writeJSON(GROUPS_FILE, { groups: result.groups, updatedAt: new Date().toISOString() });
