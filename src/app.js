@@ -432,6 +432,27 @@ app.get('/api/status', (req, res) => {
   res.json({ status: botStatus, qr: (botStatus === 'qr' && cachedQR) ? cachedQR : null });
 });
 
+app.get('/api/debug', async (req, res) => {
+  try {
+    const r = await Promise.race([
+      client.pupPage.evaluate(() => {
+        try {
+          return {
+            url: location.href,
+            hasStore: typeof window.Store !== 'undefined',
+            hasChat: typeof window.Store?.Chat !== 'undefined',
+            modelCount: window.Store?.Chat?.models?.length ?? -1,
+            groupCount: (window.Store?.Chat?.models || []).filter(c => c?.isGroup).length,
+            hasSendFn: typeof window.sendGroupsToNode === 'function'
+          };
+        } catch(e) { return { evalError: e.message }; }
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Chrome JS blocked')), 8000))
+    ]);
+    res.json(r);
+  } catch(e) { res.json({ error: e.message, botStatus }); }
+});
+
 app.get('/api/day-messages/:groupId/:date', (req, res) => {
   const groupId = decodeURIComponent(req.params.groupId);
   const date    = req.params.date;
