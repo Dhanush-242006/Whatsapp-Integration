@@ -123,44 +123,50 @@ client.on('ready', async () => {
 });
 
 async function injectGroupWatcher() {
+  // Forward Chrome console logs prefixed [watcher] to Node stdout
   try {
-    // Expose a Node.js function that Chrome JS can call directly
+    client.pupPage.on('console', msg => {
+      const t = msg.text();
+      if (t.startsWith('[watcher]')) console.log('🖥️ Chrome:', t);
+    });
+  } catch (_) {}
+
+  try {
     await client.pupPage.exposeFunction('sendGroupsToNode', (groups) => {
       if (!groups || !groups.length) return;
       writeJSON(GROUPS_FILE, { groups, updatedAt: new Date().toISOString() });
       console.log(`📋 ${groups.length} groups auto-loaded from WA store`);
-      broadcast('groups_ready', {});
     });
-  } catch (_) {} // already exposed on reconnect
+  } catch (_) {}
 
   try {
-    // Inject a setInterval INSIDE Chrome — runs in WA's own event loop, no external timeout
     await client.pupPage.evaluate(() => {
-      const extract = () => {
-        try {
-          const models = window.Store && window.Store.Chat && window.Store.Chat.models;
-          if (!models || !models.length) return false;
-          const groups = [];
-          for (let i = 0; i < models.length; i++) {
-            const c = models[i];
-            if (c && c.isGroup && c.id && c.id._serialized)
-              groups.push({ id: c.id._serialized, name: c.name || c.formattedTitle || '', participants: [] });
-          }
-          if (!groups.length) return false;
-          window.sendGroupsToNode(groups);
-          return true;
-        } catch (_) { return false; }
+      const pending = {};
+
+      const addChat = (c) => {
+        if (c && c.isGroup && c.id && c.id._serialized)
+          pending[c.id._serialized] = { id: c.id._serialized, name: c.name || c.formattedTitle || '', participants: [] };
       };
-      if (!extract()) {
-        const iv = setInterval(() => { if (extract()) clearInterval(iv); }, 3000);
-        setTimeout(() => clearInterval(iv), 7200000); // stop after 2h
-      }
+
+      const flush = () => {
+        const list = Object.values(pending);
+        const mc = window.Store?.Chat?.models?.length ?? 'n/a';
+        console.log(`[watcher] flush: ${list.length} groups, totalModels: ${mc}`);
+        if (list.length > 0) window.sendGroupsToNode(list);
+      };
+
+      // Listen for chats added one by one as WA syncs
+      try { window.Store.Chat.on('add', addChat); } catch(e) { console.log('[watcher] on-add err:', e.message); }
+
+      // Capture anything already in the store
+      try { (window.Store.Chat.models || []).forEach(addChat); } catch(e) { console.log('[watcher] models err:', e.message); }
+
+      flush();
+      setInterval(flush, 10000);
     });
     console.log('👀 Group watcher injected into Chrome');
   } catch (e) {
-    console.log('⚠️ Watcher injection failed, falling back to retry loop:', e.message);
-    const retry = async () => { if (!await saveGroups()) setTimeout(retry, 600000); };
-    setTimeout(retry, 300000);
+    console.log('⚠️ Watcher injection failed:', e.message);
   }
 }
 client.on('auth_failure', () => {
