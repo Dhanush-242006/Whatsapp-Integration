@@ -81,7 +81,7 @@ const client = new Client({
   authStrategy: new LocalAuth({ dataPath: DATA_DIR }),
   puppeteer: {
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-    protocolTimeout: 300000,
+    protocolTimeout: 900000, // 15 min — WA decryption can block JS thread
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -120,7 +120,15 @@ client.on('ready', async () => {
   console.log('✅ WhatsApp connected!');
   broadcast('ready', {});
 
-  setTimeout(async () => { await saveGroups(); }, 180000); // wait 3min for WA store to finish syncing
+  // WA decrypts messages in background — JS thread unblocks when sync finishes (can take 30+ min first time)
+  const autoFetch = async () => {
+    const ok = await saveGroups();
+    if (!ok) {
+      console.log('📋 WA still syncing, retrying in 10 min...');
+      setTimeout(autoFetch, 600000);
+    }
+  };
+  setTimeout(autoFetch, 300000); // first try after 5 min
 });
 client.on('auth_failure', () => {
   console.log('🔑 Auth failed — clearing session and restarting...');
@@ -300,12 +308,13 @@ async function saveGroups(retries = 3) {
       if (!result.ok) throw new Error(result.error);
       writeJSON(GROUPS_FILE, { groups: result.groups, updatedAt: new Date().toISOString() });
       console.log(`📋 ${result.groups.length} groups saved`);
-      return;
+      return true;
     } catch (err) {
       console.error(`saveGroups attempt ${i + 1}:`, err.message);
       if (i < retries - 1) await new Promise(r => setTimeout(r, 15000));
     }
   }
+  return false;
 }
 
 function generateDailySummary() {
