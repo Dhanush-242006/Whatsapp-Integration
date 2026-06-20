@@ -231,7 +231,8 @@ async function injectGroupWatcher() {
     try { (window.Store.Chat.models || []).forEach(addToPending); } catch(e) { console.log('[watcher] models err: ' + e.message); }
 
     flush();
-    setInterval(flush, 30000);
+    console.log('[watcher] STARTED — setInterval every 5s');
+    setInterval(flush, 5000);
   });
 
   watcherInjected = true;
@@ -252,6 +253,15 @@ client.on('message_create', async (msg) => {
     const chat = await msg.getChat();
     if (!chat.isGroup) return;
     const groupId = chat.id._serialized;
+
+    // Auto-discover this group if not already saved (works without Chrome JS thread being free)
+    const gd = readJSON(GROUPS_FILE) || { groups: [] };
+    if (!gd.groups.find(g => g.id === groupId)) {
+      gd.groups.push({ id: groupId, name: chat.name || groupId, participants: [] });
+      writeJSON(GROUPS_FILE, gd);
+      console.log(`📋 Auto-discovered group via message: ${chat.name}`);
+      broadcast('groups_updated', { count: gd.groups.length });
+    }
     let number, name;
     if (msg.fromMe) {
       number = client.info.wid.user;
