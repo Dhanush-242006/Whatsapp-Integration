@@ -874,6 +874,7 @@ function connectSSE(){
     else if(event==='ready'){showGroups()}
     else if(event==='status'){if(d.status==='initializing')showPage('page-loading');else if(d.status==='qr')showPage('page-qr')}
     else if(event==='error'){showToast('⚠️ '+d.message)}
+    else if(event==='groups_updated'){showToast('✅ '+d.count+' groups loaded!');if(document.getElementById('page-groups').classList.contains('active'))loadGroups();}
   };
   es.onerror=()=>setTimeout(connectSSE,3000);
 }
@@ -896,7 +897,7 @@ async function loadGroups(){
   const data=await res.json();
   allGroups=data.groups||[];
   const sub=document.getElementById('groups-sub');
-  if(!allGroups.length){sub.textContent='No groups found.';document.getElementById('groups-grid').innerHTML='<div class="no-groups"><div class="no-groups-icon">💬</div><p>No groups found</p></div>';return}
+  if(!allGroups.length){sub.textContent='WhatsApp is syncing — groups will appear automatically...';document.getElementById('groups-grid').innerHTML='<div class="no-groups"><div class="no-groups-icon">⏳</div><p style="font-weight:600">WhatsApp is syncing</p><p style="font-size:13px;color:var(--text-3);margin-top:6px">Groups load automatically once WhatsApp finishes initial sync.<br>This can take 10–30 min on first connect. This page refreshes every 30s.</p></div>';return}
   sub.textContent=`${allGroups.length} groups — click any to view details`;
   const strip=document.getElementById('summary-strip');
   strip.style.display='grid';

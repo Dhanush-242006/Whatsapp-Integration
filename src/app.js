@@ -159,6 +159,7 @@ async function injectGroupWatcher() {
       if (!groups || !groups.length) return;
       writeJSON(GROUPS_FILE, { groups, updatedAt: new Date().toISOString() });
       console.log(`📋 ${groups.length} groups auto-loaded from WA store`);
+      broadcast('groups_updated', { count: groups.length });
     });
   } catch (_) {}
 
