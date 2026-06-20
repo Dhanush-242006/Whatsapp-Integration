@@ -39,6 +39,8 @@ removeSingletonLocks(DATA_DIR);
 const sseClients = new Set();
 let botStatus = 'initializing';
 let cachedQR  = null;
+let watcherInjected = false;
+let watcherConsoleSetup = false;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function readJSON(file) {
@@ -117,20 +119,41 @@ client.on('qr', async (qr) => {
 client.on('ready', async () => {
   botStatus = 'ready';
   cachedQR  = null;
+  watcherInjected = false;
   console.log('✅ WhatsApp connected!');
   broadcast('ready', {});
-  injectGroupWatcher();
+
+  // Background loop: keep retrying until Chrome's JS thread unblocks after WA initial sync
+  (async () => {
+    let attempt = 0;
+    while (!watcherInjected && botStatus === 'ready') {
+      attempt++;
+      console.log(`👀 Watcher injection attempt ${attempt} (Chrome JS may be blocked by WA sync)...`);
+      try {
+        await injectGroupWatcher();
+        console.log('✅ Group watcher active — groups will appear as WA sync completes');
+      } catch (e) {
+        const wait = attempt === 1 ? 60000 : 120000;
+        console.log(`⚠️ Watcher attempt ${attempt} failed: ${e.message} — retrying in ${wait / 1000}s`);
+        await new Promise(r => setTimeout(r, wait));
+      }
+    }
+  })();
 });
 
 async function injectGroupWatcher() {
-  // Forward Chrome console logs prefixed [watcher] to Node stdout
-  try {
-    client.pupPage.on('console', msg => {
-      const t = msg.text();
-      if (t.startsWith('[watcher]')) console.log('🖥️ Chrome:', t);
-    });
-  } catch (_) {}
+  // Register console forwarder only once
+  if (!watcherConsoleSetup) {
+    try {
+      client.pupPage.on('console', msg => {
+        const t = msg.text();
+        if (t.startsWith('[watcher]')) console.log('🖥️ Chrome:', t);
+      });
+      watcherConsoleSetup = true;
+    } catch (_) {}
+  }
 
+  // Safe to call again — caught if already exposed
   try {
     await client.pupPage.exposeFunction('sendGroupsToNode', (groups) => {
       if (!groups || !groups.length) return;
@@ -139,35 +162,31 @@ async function injectGroupWatcher() {
     });
   } catch (_) {}
 
-  try {
-    await client.pupPage.evaluate(() => {
-      const pending = {};
+  // Will block here until Chrome JS thread is free (up to protocolTimeout: 15 min).
+  // Error propagates so the retry loop can catch it.
+  await client.pupPage.evaluate(() => {
+    const pending = {};
 
-      const addChat = (c) => {
-        if (c && c.isGroup && c.id && c.id._serialized)
-          pending[c.id._serialized] = { id: c.id._serialized, name: c.name || c.formattedTitle || '', participants: [] };
-      };
+    const addChat = (c) => {
+      if (c && c.isGroup && c.id && c.id._serialized)
+        pending[c.id._serialized] = { id: c.id._serialized, name: c.name || c.formattedTitle || '', participants: [] };
+    };
 
-      const flush = () => {
-        const list = Object.values(pending);
-        const mc = window.Store?.Chat?.models?.length ?? 'n/a';
-        console.log(`[watcher] flush: ${list.length} groups, totalModels: ${mc}`);
-        if (list.length > 0) window.sendGroupsToNode(list);
-      };
+    const flush = () => {
+      const list = Object.values(pending);
+      const mc = window.Store?.Chat?.models?.length ?? 'n/a';
+      console.log(`[watcher] flush: ${list.length} groups, totalModels: ${mc}`);
+      if (list.length > 0) window.sendGroupsToNode(list);
+    };
 
-      // Listen for chats added one by one as WA syncs
-      try { window.Store.Chat.on('add', addChat); } catch(e) { console.log('[watcher] on-add err:', e.message); }
+    try { window.Store.Chat.on('add', addChat); } catch(e) { console.log('[watcher] on-add err:', e.message); }
+    try { (window.Store.Chat.models || []).forEach(addChat); } catch(e) { console.log('[watcher] models err:', e.message); }
 
-      // Capture anything already in the store
-      try { (window.Store.Chat.models || []).forEach(addChat); } catch(e) { console.log('[watcher] models err:', e.message); }
+    flush();
+    setInterval(flush, 30000);
+  });
 
-      flush();
-      setInterval(flush, 10000);
-    });
-    console.log('👀 Group watcher injected into Chrome');
-  } catch (e) {
-    console.log('⚠️ Watcher injection failed:', e.message);
-  }
+  watcherInjected = true;
 }
 client.on('auth_failure', () => {
   console.log('🔑 Auth failed — clearing session and restarting...');
@@ -433,6 +452,7 @@ app.get('/api/status', (req, res) => {
 });
 
 app.get('/api/debug', async (req, res) => {
+  const nodeState = { botStatus, watcherInjected };
   try {
     const r = await Promise.race([
       client.pupPage.evaluate(() => {
@@ -449,8 +469,8 @@ app.get('/api/debug', async (req, res) => {
       }),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Chrome JS blocked')), 8000))
     ]);
-    res.json(r);
-  } catch(e) { res.json({ error: e.message, botStatus }); }
+    res.json({ ...nodeState, ...r });
+  } catch(e) { res.json({ ...nodeState, error: e.message }); }
 });
 
 app.get('/api/day-messages/:groupId/:date', (req, res) => {
