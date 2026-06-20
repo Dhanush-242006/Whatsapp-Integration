@@ -168,9 +168,12 @@ async function injectGroupWatcher() {
   await client.pupPage.evaluate(() => {
     const pending = {};
 
-    const addChat = (c) => {
-      if (c && c.isGroup && c.id && c.id._serialized)
+    const addToPending = (c) => {
+      if (c && c.isGroup && c.id && c.id._serialized) {
         pending[c.id._serialized] = { id: c.id._serialized, name: c.name || c.formattedTitle || '', participants: [] };
+        return true;
+      }
+      return false;
     };
 
     const flush = () => {
@@ -180,11 +183,26 @@ async function injectGroupWatcher() {
       if (list.length > 0) window.sendGroupsToNode(list);
     };
 
-    try { window.Store.Chat.on('add', addChat); } catch(e) { console.log('[watcher] on-add err:', e.message); }
-    try { (window.Store.Chat.models || []).forEach(addChat); } catch(e) { console.log('[watcher] models err:', e.message); }
+    const onAdd = (c) => {
+      // Send immediately on each add — don't wait for setInterval
+      if (addToPending(c)) window.sendGroupsToNode(Object.values(pending));
+    };
+
+    const onReset = () => {
+      // WA uses reset() for bulk initial chat load — 'add' events don't fire for these
+      console.log('[watcher] Store.Chat reset — rescanning all models');
+      try { (window.Store.Chat.models || []).forEach(addToPending); } catch(e) {}
+      flush();
+    };
+
+    try { window.Store.Chat.on('add', onAdd); } catch(e) { console.log('[watcher] on-add err:', e.message); }
+    try { window.Store.Chat.on('reset', onReset); } catch(e) { console.log('[watcher] on-reset err:', e.message); }
+
+    // Capture anything already in store at injection time
+    try { (window.Store.Chat.models || []).forEach(addToPending); } catch(e) { console.log('[watcher] models err:', e.message); }
 
     flush();
-    setInterval(flush, 30000);
+    setInterval(flush, 30000); // backup: periodic scan
   });
 
   watcherInjected = true;
