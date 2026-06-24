@@ -66,6 +66,24 @@ function clearSession() {
   }
 }
 
+// Merge new groups into groups.json — never removes existing entries
+function mergeGroups(newGroups) {
+  if (!newGroups || !newGroups.length) return 0;
+  const existing = readJSON(GROUPS_FILE) || { groups: [] };
+  const knownIds = new Set(existing.groups.map(g => g.id));
+  let added = 0;
+  for (const g of newGroups) {
+    if (g.id && !knownIds.has(g.id)) {
+      existing.groups.push({ id: g.id, name: g.name || g.id, participants: g.participants || [] });
+      knownIds.add(g.id);
+      added++;
+    }
+  }
+  existing.updatedAt = new Date().toISOString();
+  writeJSON(GROUPS_FILE, existing);
+  return existing.groups.length;
+}
+
 function cleanOldMessages(msgs) {
   const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
   for (const gId of Object.keys(msgs)) {
@@ -132,6 +150,15 @@ client.on('ready', async () => {
       try {
         await injectGroupWatcher();
         console.log('✅ Group watcher active — groups will appear as WA sync completes');
+        // Now that Chrome is partly accessible, poll saveGroups every 5 min
+        (async () => {
+          while (botStatus === 'ready') {
+            await new Promise(r => setTimeout(r, 300000)); // 5 min
+            if (botStatus !== 'ready') break;
+            console.log('🔄 Periodic saveGroups attempt...');
+            await saveGroups(1);
+          }
+        })();
       } catch (e) {
         const wait = attempt === 1 ? 60000 : 120000;
         console.log(`⚠️ Watcher attempt ${attempt} failed: ${e.message} — retrying in ${wait / 1000}s`);
@@ -153,9 +180,9 @@ async function injectGroupWatcher() {
           try {
             const groups = JSON.parse(t.slice(8));
             if (groups && groups.length) {
-              writeJSON(GROUPS_FILE, { groups, updatedAt: new Date().toISOString() });
-              console.log(`📋 ${groups.length} groups received via console channel`);
-              broadcast('groups_updated', { count: groups.length });
+              const total = mergeGroups(groups);
+              console.log(`📋 console channel: merged → ${total} total groups`);
+              broadcast('groups_updated', { count: total });
             }
           } catch(e) { console.log('⚠️ Groups parse err:', e.message); }
         }
@@ -168,9 +195,9 @@ async function injectGroupWatcher() {
   try {
     await client.pupPage.exposeFunction('sendGroupsToNode', (groups) => {
       if (!groups || !groups.length) return;
-      writeJSON(GROUPS_FILE, { groups, updatedAt: new Date().toISOString() });
-      console.log(`📋 ${groups.length} groups auto-loaded from WA store`);
-      broadcast('groups_updated', { count: groups.length });
+      const total = mergeGroups(groups);
+      console.log(`📋 watcher: merged → ${total} total groups`);
+      broadcast('groups_updated', { count: total });
     });
   } catch (_) {}
 
@@ -254,13 +281,12 @@ client.on('message_create', async (msg) => {
     if (!chat.isGroup) return;
     const groupId = chat.id._serialized;
 
-    // Auto-discover this group if not already saved (works without Chrome JS thread being free)
-    const gd = readJSON(GROUPS_FILE) || { groups: [] };
-    if (!gd.groups.find(g => g.id === groupId)) {
-      gd.groups.push({ id: groupId, name: chat.name || groupId, participants: [] });
-      writeJSON(GROUPS_FILE, gd);
-      console.log(`📋 Auto-discovered group via message: ${chat.name}`);
-      broadcast('groups_updated', { count: gd.groups.length });
+    // Auto-discover this group if not already saved
+    const prevCount = (readJSON(GROUPS_FILE) || { groups: [] }).groups.length;
+    const total = mergeGroups([{ id: groupId, name: chat.name || groupId, participants: [] }]);
+    if (total > prevCount) {
+      console.log(`📋 Auto-discovered group via message: ${chat.name} (${total} total)`);
+      broadcast('groups_updated', { count: total });
     }
     let number, name;
     if (msg.fromMe) {
@@ -419,8 +445,8 @@ async function saveGroups(retries = 3) {
         new Promise((_, reject) => setTimeout(() => reject(new Error('store read timeout after 2min')), 120000))
       ]);
       if (!result.ok) throw new Error(result.error);
-      writeJSON(GROUPS_FILE, { groups: result.groups, updatedAt: new Date().toISOString() });
-      console.log(`📋 ${result.groups.length} groups saved`);
+      const total = mergeGroups(result.groups);
+      console.log(`📋 saveGroups: merged → ${total} total groups`);
       return true;
     } catch (err) {
       console.error(`saveGroups attempt ${i + 1}:`, err.message);
