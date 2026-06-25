@@ -949,11 +949,11 @@ app.listen(PORT, () => console.log(`🌐 Dashboard: http://localhost:${PORT}`));
 console.log('🚀 Starting WhatsApp Monitor...');
 client.initialize();
 
-// Watchdog: only exit if stuck in 'initializing' (Chrome failed to launch)
-// Don't exit if 'qr' — user may just need to scan
+// Watchdog: kill only if Chrome never got past 'initializing' after 15 min.
+// Railway's slow CPU needs extra time to launch Chromium on first boot.
 setTimeout(() => {
   if (botStatus === 'initializing') {
-    console.error('⏰ Watchdog: Chrome stuck initializing — restarting...');
+    console.error('⏰ Watchdog: Chrome stuck after 15 min — restarting...');
     process.exit(1);
   }
-}, 5 * 60 * 1000);
+}, 15 * 60 * 1000);
